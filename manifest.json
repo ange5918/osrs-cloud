@@ -1,0 +1,32 @@
+{
+  "repo": "osrs-cloud-local",
+  "version": 1,
+  "updated": "2026-11-22",
+  "description": "云端脚本仓库（本地演示版；换 HTTP(url) 即为真云端）",
+  "scripts": [
+    {
+      "name": "chicken",
+      "desc": "鸡区打鸡 Java 版（悬浮窗点启动即跑）",
+      "version": "1.0",
+      "type": "java",
+      "entry": "mybot.ChickenBot",
+      "path": "jars/chicken.jar",
+      "sha256": "29b315761ea65e5f150c5096d62efd61f76acb20814b6b25b25c7f6d1a2075e1",
+      "class": "mybot.ChickenBot"
+    },
+    {
+      "name": "myplugin",
+      "desc": "MyPlugin 官方API版(Shim兼容层,floor跨层修复)",
+      "version": "1.0",
+      "type": "ghost-java",
+      "entry": "myplugin.MyPlugin",
+      "path": "jars/myplugin.jar",
+      "sha256": "c68cbf443af55e42b204f259e7ecb208685f9ba29eda93c83d06f59d587ffe84",
+      "class": "myplugin.MyPlugin"
+    }
+  ],
+  "offsets": {
+    "242": "offsets/242.json",
+    "default": "offsets/242.json"
+  }
+}

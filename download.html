@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OSRS 脚本下载</title>
+<style>
+  :root{--bg:#0f1115;--card:#1a1d24;--line:#2a2f3a;--txt:#e8eaed;--sub:#9aa0aa;--acc:#4ade80;--acc2:#60a5fa}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:18px;line-height:1.5}
+  h1{font-size:20px;margin:4px 0 2px}
+  .sub{color:var(--sub);font-size:13px;margin-bottom:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+  .name{font-size:17px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .tag{font-size:11px;color:var(--acc2);border:1px solid var(--acc2);border-radius:20px;padding:1px 8px}
+  .desc{color:var(--sub);font-size:13px;margin:8px 0 14px}
+  .btns{display:flex;gap:10px;flex-wrap:wrap}
+  a.btn{display:inline-block;text-decoration:none;text-align:center;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:700;flex:1;min-width:120px}
+  .primary{background:var(--acc);color:#08130b}
+  .ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+  .meta{color:var(--sub);font-size:11px;margin-top:12px;word-break:break-all}
+  .tip{background:#16213a;border:1px solid #2a3d63;border-radius:10px;padding:12px;font-size:12px;color:#b9cef5;margin:16px 0}
+  code{background:#0008;padding:1px 5px;border-radius:4px;font-size:11px}
+  .foot{color:var(--sub);font-size:12px;text-align:center;margin-top:20px}
+</style>
+</head>
+<body>
+  <h1>OSRS 脚本下载</h1>
+  <div class="sub">在手机或模拟器浏览器里点一下，脚本就存到「下载」目录</div>
+
+  <div id="list"></div>
+
+  <div class="tip">
+    📱 <b>运行方式</b>：在悬浮窗点 ⟳ 刷新，就能看到云端脚本；点脚本 → 启动即可运行。<br>
+    ⚠️ 脚本真正跑起来靠 PC 上的自研 API 引擎控制游戏——手机/模拟器负责显示和点按钮。
+  </div>
+
+  <div class="foot"><span id="updated"></span></div>
+
+<script>
+const BASE = location.origin + location.pathname.replace(/download\.html.*$/, '');
+fetch(BASE + 'manifest.json?t=' + Date.now()).then(r => r.json()).then(mf => {
+  document.getElementById('updated').textContent = '仓库更新：' + (mf.updated || '-');
+  const box = document.getElementById('list');
+  (mf.scripts || []).forEach(s => {
+    const dl = BASE + (s.path || ('scripts/' + s.name + '.py'));
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML =
+      '<div class="name">' + s.name + '<span class="tag">v' + (s.version||'1') + '</span></div>' +
+      '<div class="desc">' + (s.desc||'') + '</div>' +
+      '<div class="btns">' +
+        '<a class="btn primary" href="' + dl + '" download>⬇ 下载脚本</a>' +
+        '<a class="btn ghost" href="' + dl + '" target="_blank">👁 查看源码</a>' +
+      '</div>' +
+      '<div class="meta">sha256: ' + (s.sha256||'-') + '</div>';
+    box.appendChild(card);
+  });
+}).catch(e => {
+  document.getElementById('list').innerHTML = '<div class="card">加载清单失败：' + e + '</div>';
+});
+</script>
+</body>
+</html>
