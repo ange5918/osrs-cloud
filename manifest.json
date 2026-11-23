@@ -113,6 +113,16 @@
       "sha256": "17b1bd987303165442d928a9d2402e385467e594a49982ba85c129bac25ebbe8",
       "class": "objfix.ObjFixVerify",
       "entry": "objfix.ObjFixVerify"
+    },
+    {
+      "name": "objread",
+      "desc": "验证native object读取偏移修复",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/objread.dex",
+      "sha256": "12a362595f098676a604d94753ac5f8e3572a46e8194e4af12183635fec294ee",
+      "class": "objread.ObjReadVerify",
+      "entry": "objread.ObjReadVerify"
     }
   ],
   "offsets": {
