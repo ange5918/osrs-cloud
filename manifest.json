@@ -93,6 +93,16 @@
       "sha256": "b82f5068a32829e3d3dd7e8044924d523ca58acb2101fd15baac8781cc753bdf",
       "class": "navbot.NavBot",
       "entry": "navbot.NavBot"
+    },
+    {
+      "name": "stairprobe",
+      "desc": "楼梯发包暴力探针",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/stairprobe.dex",
+      "sha256": "4bb779b79dcb1f4d04f7a43bc938765707e8fd4181ac46693f131aceabf6560d",
+      "class": "stairprobe.StairProbe",
+      "entry": "stairprobe.StairProbe"
     }
   ],
   "offsets": {
