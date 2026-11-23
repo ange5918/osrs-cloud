@@ -13,7 +13,8 @@ import java.util.*;
  * 端上实时寻路 —— 官方 collision.neighbours3 / astar3 的精确复刻（纯 Java，零 PC 依赖）。
  * 可走图由官方 CollisionMap.neighbours3 离线导出(含门/栅栏/单向边)，
  * transports 跨层边来自官方 transports.json。逐格 A*，卡住即时从当前位置重规划。
- * 路线：当前 -> L2(3208,3219,2) -> GE2(3203,3473,2)。
+ * 路线(地面版)：当前 -> GE拍卖行(3164,3487,0) 全程plane0 纯walk。
+ * [爬楼梯2楼版备份见 NavBot.java.bak_before_ge_ground]
  */
 @PluginDescriptor(name = "实时寻路", description = "端上官方A*实时规划", enabledByDefault = true)
 public final class NavBot implements Plugin {
@@ -1870,7 +1871,7 @@ public final class NavBot implements Plugin {
                 edgeIdx.computeIfAbsent(key(ed.sx,ed.sy,ed.sp),k->new ArrayList<>()).add(ed);}
         }catch(Throwable e){ctx.log("[实时导航] 数据初始化失败: "+e);finished=true;return;}
         ctx.log("[实时导航] 启动 图"+graph.length+"字节 边"+EDGE_DATA.length+"条");
-        setGoal(3208,3219,2,"L2");
+        setGoal(3164,3487,0,"GE拍卖行");
     }
     public void shutDown(){ctx.log("[实时导航] 停止");}
 
@@ -1965,9 +1966,8 @@ public final class NavBot implements Plugin {
         WorldPoint me=client.getLocalPlayerLocation(); if(me==null)return;
         long t=client.getTickCount();
 
-        if((Math.abs(me.getX()-goalX)<=1&&Math.abs(me.getY()-goalY)<=1&&me.getPlane()==goalP)){
-            if(!reachedL2){ctx.log("[实时导航] ★★★到达 L2 "+me+" → GE2");reachedL2=true;setGoal(3203,3473,2,"GE2");return;}
-            ctx.log("[实时导航] ★★★★到达终点 GE2 "+me);finished=true;return;
+        if((Math.abs(me.getX()-goalX)<=2&&Math.abs(me.getY()-goalY)<=2&&me.getPlane()==goalP)){
+            ctx.log("[实时导航] ★★★★到达终点 GE拍卖行 "+me);finished=true;return;
         }
 
         // 卡住检测
