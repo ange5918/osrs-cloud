@@ -1859,6 +1859,8 @@ public final class NavBot implements Plugin {
     private long lastWalkTick=-1,lastLogTick=-1,lastInteractTick=-1,legStartTick=-1;
     private int stuckTicks=0,lastX=-1,lastY=-1,interactTries=0;
     private boolean finished=false,reachedL2=false;
+    // 侧移绕障(搬自历史成功脚本 ghost_walk_route.py)
+    private int side=1,sideAttempts=0,bestDist=Integer.MAX_VALUE;
 
     public void configure(PluginContext c){ctx=c;client=c.getClient();}
 
@@ -1948,6 +1950,8 @@ public final class NavBot implements Plugin {
             }
             List<Edge> es=edgeIdx.get(key(c.x,c.y,c.p));
             if(es!=null) for(Edge e:es){
+                // ★只保留跨层边(楼梯)。同层跳跃边(teleport/mine-cart)会让walkTo走远点撞墙
+                if(e.sp==e.dp) continue;
                 double ng=c.g+1.0; long nk=key(e.dx,e.dy,e.dp);
                 PtState old=best.get(nk);
                 if(old==null||ng<old.p.g-1e-6){
@@ -1970,13 +1974,23 @@ public final class NavBot implements Plugin {
             ctx.log("[实时导航] ★★★★到达终点 GE拍卖行 "+me);finished=true;return;
         }
 
-        // 卡住检测
-        if(me.getX()==lastX&&me.getY()==lastY) stuckTicks++; else stuckTicks=0;
+        // 卡住检测(坐标无变化)
+        boolean moved=(me.getX()!=lastX||me.getY()!=lastY);
+        if(!moved) stuckTicks++; else stuckTicks=0;
         lastX=me.getX();lastY=me.getY();
 
-        // 重规划: 无路径/走完/卡住
-        boolean needReplan=path.isEmpty()||pathIdx>=path.size()||stuckTicks>60;
+        // 距离进展(向终点靠近则记录best)
+        int curDist=Math.abs(me.getX()-goalX)+Math.abs(me.getY()-goalY);
+        if(curDist<bestDist){bestDist=curDist;}
+
+        // 重规划: 无路径/走完/卡住超过12tick
+        boolean needReplan=path.isEmpty()||pathIdx>=path.size()||stuckTicks>25;
         if(needReplan){
+            // 卡住时先尝试侧移(原地重规划没用), 连续侧移2次才重规划
+            if(stuckTicks>25 && sideAttempts<2){
+                sideAttempts++;
+                if(sideAttempts>=2) side=-side;
+            }
             List<Pt> p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
             if(p.isEmpty()){
                 if(t-lastLogTick>=100){lastLogTick=t;ctx.log("[实时导航] 规划失败 "+me+" -> "+goalName);}
@@ -1984,14 +1998,6 @@ public final class NavBot implements Plugin {
             }
             path=p;pathIdx=0;stuckTicks=0;lastWalkTick=-1;
             ctx.log("[实时导航] 规划 "+p.size()+"步 "+me.getX()+","+me.getY()+",p"+me.getPlane()+" -> "+goalName);
-            // 前6步明细(诊断用)
-            StringBuilder db=new StringBuilder("前几步:");
-            for(int i=0;i<Math.min(6,p.size());i++){Pt q=p.get(i);db.append(" ").append(q.x).append(",").append(q.y).append("p").append(q.p);}
-            ctx.log("[实时导航] "+db);
-        }
-        if(lastLogTick<0||t-lastLogTick>=50){
-            lastLogTick=t;
-            ctx.log("[实时导航] pos="+me.getX()+","+me.getY()+",p"+me.getPlane()+" 步"+pathIdx+"/"+path.size());
         }
         if(pathIdx>=path.size())return;
         Pt target=path.get(pathIdx);
@@ -2023,11 +2029,44 @@ public final class NavBot implements Plugin {
         }
         interactTries=0;
 
-        // 逐格走: 到达当前目标(容差1)则推进; 未到则发walk(间隔30tick=600ms,避免flood)
-        int d=Math.max(Math.abs(target.x-me.getX()),Math.abs(target.y-me.getY()));
-        if(d<=1){pathIdx++;lastWalkTick=-1;return;}
-        if(lastWalkTick<0||t-lastWalkTick>=30){
-            client.walkTo(target.x,target.y);lastWalkTick=t;
+        // 推进 pathIdx: 跳过所有离玩家<=1格的路径点
+        while(pathIdx<path.size()){
+            Pt q=path.get(pathIdx);
+            if(Math.max(Math.abs(q.x-me.getX()),Math.abs(q.y-me.getY()))<=1 && q.p==me.getPlane()) pathIdx++;
+            else break;
+        }
+        if(pathIdx>=path.size())return;
+
+        // ★前瞻点: 取路径上前方 LOOKAHEAD 格的点, 让客户端自己寻路绕障(而非逐格直线)
+        // 这样服务端路径规划会绕过墙/障碍, 避免逐格walkTo撞墙卡死
+        int LOOKAHEAD=8;
+        int li=Math.min(pathIdx+LOOKAHEAD, path.size()-1);
+        Pt aim=path.get(li);
+        // 确保aim与玩家同层且不是跨层点
+        for(int j=li;j>=pathIdx;j--){Pt q=path.get(j); if(q.p==me.getPlane()){aim=q;break;}}
+        int aimX=aim.x, aimY=aim.y;
+
+        // 卡住侧移: 给目标加垂直偏移, 迫使服务端换一条路(搬自历史成功脚本)
+        int wx=aimX-me.getX(), wy=aimY-me.getY();
+        int len=(int)Math.sqrt(wx*wx+wy*wy);
+        if(stuckTicks>=6 && len>0){
+            double ux=wx/(double)len, uy=wy/(double)len;
+            int off=side*Math.min(9+3*sideAttempts,26);
+            aimX=(int)Math.round(aimX-uy*off);
+            aimY=(int)Math.round(aimY+ux*off);
+            if(lastLogTick<0||t-lastLogTick>=20){
+                lastLogTick=t;
+                ctx.log("[实时导航] 卡住侧移 off="+off+" ->("+aimX+","+aimY+") stuck="+stuckTicks);
+            }
+        } else if(moved && sideAttempts>0){
+            sideAttempts=0; // 恢复移动, 清除侧移
+        }
+
+        if(lastWalkTick<0||t-lastWalkTick>=15){
+            client.walkTo(aimX,aimY);lastWalkTick=t;
+            if(t-lastLogTick>=30){lastLogTick=t;
+                ctx.log("[实时导航] pos="+me.getX()+","+me.getY()+" aim="+aimX+","+aimY+" 步"+pathIdx+"/"+path.size()+" best="+bestDist);
+            }
         }
     }
 

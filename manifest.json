@@ -90,7 +90,7 @@
       "version": "1.0",
       "type": "dex",
       "path": "dex/navbot.dex",
-      "sha256": "f2609d2db56ac939151b7da2028dfcd0444587a3f2607f47213118135085d462",
+      "sha256": "3451da8bd2238c46585b95fc59d5e5e337f0036b193715e3ceb71beae4c2d1d6",
       "class": "navbot.NavBot",
       "entry": "navbot.NavBot"
     },
