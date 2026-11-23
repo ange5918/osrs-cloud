@@ -23,12 +23,37 @@ public final class CloudDemoBot implements Plugin {
         this.client = context.getClient();
     }
 
-    private boolean walked = false;
+    private boolean attacked = false;
 
     public void startUp() {
         ctx.log("[云端脚本] ★★★ 我是从云端 dex 动态加载并运行成功的! ★★★");
-        ctx.log("[云端脚本] version=1.2 新增 socket 直发走路验证");
-        walked = false;
+        ctx.log("[云端脚本] version=1.4 interact 发包验证");
+        attacked = false;
+    }
+
+    /** 启动后打印 NPC 诊断并对第一只 Chicken 发 attack */
+    private void diagnoseAndAttack(long tick) {
+        if (attacked || tick < 30) return;
+        attacked = true;
+        java.util.List<com.astrastudio.api.model.NPC> npcs = client.getNpcs();
+        ctx.log("[云端脚本] NPC 总数=" + npcs.size());
+        com.astrastudio.api.model.NPC target = null;
+        int shown = 0;
+        for (com.astrastudio.api.model.NPC n : npcs) {
+            if (shown++ < 8) {
+                com.astrastudio.api.model.WorldPoint p = n.getWorldLocation();
+                ctx.log("[云端脚本] NPC name=" + n.getName() + " id=" + n.getId()
+                    + " idx=" + n.getIndex() + " pos=" + (p==null?"?":p.getX()+","+p.getY()));
+            }
+            if ("Chicken".equals(n.getName()) && target == null) target = n;
+        }
+        if (target != null) {
+            ctx.log("[云端脚本] >>> 对 Chicken idx=" + target.getIndex() + " 发 Attack 包");
+            client.interactNpc(target, "Attack");
+            ctx.log("[云端脚本] >>> Attack 发包已调用");
+        } else {
+            ctx.log("[云端脚本] >>> 未找到 Chicken（诊断上面）");
+        }
     }
 
     /** 启动后延迟约 30 tick 走一步（向东 3 格），验证 native 发包 */
@@ -49,6 +74,7 @@ public final class CloudDemoBot implements Plugin {
     @Subscribe
     public void onTick(GameTick tick) {
         counter++;
+        diagnoseAndAttack(tick.getTick());
         if (tick.getTick() % 100 != 0) return;
         WorldPoint me = client.getLocalPlayerLocation();
         int npcCount = 0;
