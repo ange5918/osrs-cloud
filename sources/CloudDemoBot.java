@@ -56,17 +56,6 @@ public final class CloudDemoBot implements Plugin {
         }
     }
 
-    /** 启动后延迟约 30 tick 走一步（向东 3 格），验证 native 发包 */
-    private void tryWalkDemo(long tick) {
-        if (walked || tick < 30) return;
-        WorldPoint me = client.getLocalPlayerLocation();
-        if (me == null) return;
-        walked = true;
-        int tx = me.getX() + 3, ty = me.getY();
-        ctx.log("[云端脚本] 走路测试: (" + me.getX() + "," + me.getY() + ") -> (" + tx + "," + ty + ")");
-        client.walkTo(tx, ty);   // socket 直发，日志会打印 OK/FAIL + fd
-    }
-
     public void shutDown() {
         ctx.log("[云端脚本] 已停止, 共 " + counter + " tick");
     }
