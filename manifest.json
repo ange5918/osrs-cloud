@@ -43,6 +43,16 @@
       "sha256": "d21ae6ce88f5ed81e9f230f116e19d5ad98fc5a5673aaf2c4df726f32fa6a627",
       "class": "ghostdiag.GhostDiag",
       "entry": "ghostdiag.GhostDiag"
+    },
+    {
+      "name": "ghostdump",
+      "desc": "去Ghost依赖诊断：内存读NPC def真名+定位js5 cache文件",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/ghostdump.dex",
+      "sha256": "b95a8404e65a8b5e6982dbe8e95c4addaa3494d476f3ee4f7016b107db86a713",
+      "class": "ghostdump.GhostDump",
+      "entry": "ghostdump.GhostDump"
     }
   ],
   "offsets": {
