@@ -83,6 +83,16 @@
       "sha256": "2e5a2a13c0dad04c16c162f8379bfaf0521c9eae8d53031abc9f605c15ab613c",
       "class": "routerunner.RouteRunner",
       "entry": "routerunner.RouteRunner"
+    },
+    {
+      "name": "navbot",
+      "desc": "端上实时A*:鸡区->L2->GE2",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/navbot.dex",
+      "sha256": "443fa4c5c598c84971fe64aa11e9c25bb76465d84fc96e834806f3c1626dd8d8",
+      "class": "navbot.NavBot",
+      "entry": "navbot.NavBot"
     }
   ],
   "offsets": {
