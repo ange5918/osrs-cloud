@@ -1,7 +1,7 @@
 {
   "repo": "osrs-cloud-local",
   "version": 1,
-  "updated": "2026-11-22",
+  "updated": "2026-11-23",
   "description": "云端脚本仓库（本地演示版；换 HTTP(url) 即为真云端）",
   "scripts": [
     {
@@ -16,12 +16,12 @@
     },
     {
       "name": "myplugin",
-      "desc": "MyPlugin 官方API版(Shim兼容层,floor跨层修复)",
-      "version": "1.0",
-      "type": "ghost-java",
+      "desc": "MyPlugin源码版(不打包jar)",
+      "version": "2.0",
+      "type": "ghost-source",
       "entry": "myplugin.MyPlugin",
-      "path": "jars/myplugin.jar",
-      "sha256": "c68cbf443af55e42b204f259e7ecb208685f9ba29eda93c83d06f59d587ffe84",
+      "path": "sources/myplugin.java",
+      "sha256": "9dc3a12ec51f45083b8d029d4e3da415e5f33bf75f78252d3fc3eaecc843468e",
       "class": "myplugin.MyPlugin"
     }
   ],
