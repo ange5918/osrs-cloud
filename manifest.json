@@ -100,7 +100,7 @@
       "version": "1.0",
       "type": "dex",
       "path": "dex/stairprobe.dex",
-      "sha256": "4bb779b79dcb1f4d04f7a43bc938765707e8fd4181ac46693f131aceabf6560d",
+      "sha256": "de1fed8162e4636790a97e73d7bcc03e9be9d1f27bc529f6911f605d544e4a4c",
       "class": "stairprobe.StairProbe",
       "entry": "stairprobe.StairProbe"
     }
