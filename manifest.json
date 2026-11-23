@@ -30,7 +30,7 @@
       "version": "1.1",
       "type": "dex",
       "path": "dex/clouddemo.dex",
-      "sha256": "1306e5572f45a87aa86f86b060e598af05c03f61dbde72097ae9a475f9ad13aa",
+      "sha256": "7073907310197080f9cc237e3b125b9ccf28be7ba546e2e5857592a631e91db8",
       "class": "cloudbot.CloudDemoBot",
       "entry": "cloudbot.CloudDemoBot"
     }
