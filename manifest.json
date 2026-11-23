@@ -63,6 +63,16 @@
       "sha256": "16e9285e97971abea496c0f0d00c3f6c01b68567bf8b6d99ab1aa2aaf1ad6494",
       "class": "smoke.PacketSmoke",
       "entry": "smoke.PacketSmoke"
+    },
+    {
+      "name": "walktrial",
+      "desc": "走路试炼:验证walk包+打印楼梯门物体",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/walktrial.dex",
+      "sha256": "b2431c6732c459112ed5f278ccad70c88e57a9b719c8704b0daad514a074458e",
+      "class": "walktrial.WalkTrial",
+      "entry": "walktrial.WalkTrial"
     }
   ],
   "offsets": {
