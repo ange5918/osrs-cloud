@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 7,
+  "version": 8,
   "updated": "2026-11-24",
   "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
@@ -23,6 +23,16 @@
       "sha256": "b63cfbc6e745a77b9c8cf0201f906673eaa4f8d10bc1b3ffc7736bffdb48650e",
       "class": "navbot.NavBot",
       "entry": "navbot.NavBot"
+    },
+    {
+      "name": "fish",
+      "desc": "fish脚本工程模板(读坐标/实体+文件启停)",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/fish.dex",
+      "sha256": "9be63f0ce9a585a2cad42aba288067f655f4d50b5fb86ea2cd71066aa0d35f7e",
+      "class": "fish.Fish",
+      "entry": "fish.Fish"
     }
   ],
   "offsets": {
