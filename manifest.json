@@ -16,12 +16,12 @@
     },
     {
       "name": "myplugin",
-      "desc": "MyPlugin源码版(不打包jar)",
-      "version": "2.0",
+      "desc": "MyPlugin源码版(带诊断日志)",
+      "version": "2.1",
       "type": "ghost-source",
       "entry": "myplugin.MyPlugin",
       "path": "sources/myplugin.java",
-      "sha256": "9dc3a12ec51f45083b8d029d4e3da415e5f33bf75f78252d3fc3eaecc843468e",
+      "sha256": "941b254c9ef5eefa6b3ed00ea207251970e2d2913c851f87ee5020320177db85",
       "class": "myplugin.MyPlugin"
     }
   ],
