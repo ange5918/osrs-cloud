@@ -35,9 +35,12 @@ public final class PacketSmoke implements Plugin {
     private Client client;
     private long tick = 0, nextAt = 0;
     private boolean started = false;
+    private boolean finished = false;
     private int step = 0;
     private static final int GAP = 12;
     private static final int TOTAL = 11;
+    /** 每一步记录发包前的 gameState，用于定位是哪个包导致断线 */
+    private int preGs = -1;
 
     public void configure(Plugin.PluginContext c) {
         this.ctx = c;
@@ -54,11 +57,13 @@ public final class PacketSmoke implements Plugin {
 
     @Subscribe
     public void onTick(GameTick t) {
+        if (finished) return;
         tick++;
         int gs = -1;
         try { gs = client.getGameState().getId(); } catch (Throwable ignored) {}
         if (gs != 30) {
-            if (tick % 150 == 0) ctx.log("[SMOKE] 等待登录 gameState=" + gs + " tick=" + tick);
+            if (tick % 150 == 0) ctx.log("[SMOKE] 等待登录/已断线 gameState=" + gs + " tick=" + tick
+                    + "（停在第 " + step + " 步之后,上一步发包前gs=" + preGs + "）");
             return;
         }
         WorldPoint me = null;
@@ -78,6 +83,7 @@ public final class PacketSmoke implements Plugin {
         }
         if (tick < nextAt) return;
         nextAt = tick + GAP;
+        preGs = gs;
         try {
             runStep(step);
         } catch (Throwable e) {
@@ -85,9 +91,9 @@ public final class PacketSmoke implements Plugin {
         }
         step++;
         if (step >= TOTAL) {
+            finished = true;
             ctx.log("[SMOKE] === 序列完成，最终 " + snap() + " ===");
             ctx.log("[SMOKE] === 请抓 logcat 'sendPacket:' 核对每包 sent=n ===");
-            step = TOTAL; // 停在此处，不重复发包
         }
     }
 

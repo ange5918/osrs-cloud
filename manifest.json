@@ -60,7 +60,7 @@
       "version": "1.0",
       "type": "dex",
       "path": "dex/packetsmoke.dex",
-      "sha256": "cb38e67d926ea80cdb81a89ff7ed911c4b6445c2ae3c939c3b5034533dd1fc40",
+      "sha256": "16e9285e97971abea496c0f0d00c3f6c01b68567bf8b6d99ab1aa2aaf1ad6494",
       "class": "smoke.PacketSmoke",
       "entry": "smoke.PacketSmoke"
     }
