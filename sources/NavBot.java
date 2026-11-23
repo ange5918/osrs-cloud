@@ -1984,6 +1984,10 @@ public final class NavBot implements Plugin {
             }
             path=p;pathIdx=0;stuckTicks=0;lastWalkTick=-1;
             ctx.log("[实时导航] 规划 "+p.size()+"步 "+me.getX()+","+me.getY()+",p"+me.getPlane()+" -> "+goalName);
+            // 前6步明细(诊断用)
+            StringBuilder db=new StringBuilder("前几步:");
+            for(int i=0;i<Math.min(6,p.size());i++){Pt q=p.get(i);db.append(" ").append(q.x).append(",").append(q.y).append("p").append(q.p);}
+            ctx.log("[实时导航] "+db);
         }
         if(lastLogTick<0||t-lastLogTick>=50){
             lastLogTick=t;
@@ -1994,15 +1998,26 @@ public final class NavBot implements Plugin {
 
         // 跨层 -> 楼梯交互
         if(target.p!=me.getPlane()){
-            int pd=Math.max(Math.abs(target.x-me.getX()),Math.abs(target.y-me.getY()));
-            if(pd>2){ if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(target.x,target.y);lastWalkTick=t;} return; }
+            int mp=me.getPlane();
+            Pt prev=pathIdx>0?path.get(pathIdx-1):new Pt(me.getX(),me.getY(),mp);
+            // 找到通往目标跨层点的边，拿到楼梯 object 的真实交互源格(sx,sy)
+            Edge ed=findEdgeTo(target.x,target.y,target.p,mp);
+            int oid=ed!=null?ed.oid:guessOid(mp,target.p);
+            int sx=ed!=null?ed.sx:target.x, sy=ed!=null?ed.sy:target.y;
+            // ★关键修复: 必须先精确站到楼梯源格, 否则 object 包坐标错、服务器不执行
+            int gap=Math.max(Math.abs(sx-me.getX()),Math.abs(sy-me.getY()));
+            if(gap>0){
+                if(lastWalkTick<0||t-lastWalkTick>=15){
+                    client.walkTo(sx,sy);lastWalkTick=t;
+                    ctx.log("[实时导航] 靠近楼梯源格 "+sx+","+sy+" 当前"+me.getX()+","+me.getY());
+                }
+                return;
+            }
             if(lastInteractTick<0||t-lastInteractTick>=40){
                 lastInteractTick=t;interactTries++;
-                Pt prev=pathIdx>0?path.get(pathIdx-1):new Pt(me.getX(),me.getY(),me.getPlane());
-                Edge ed=findEdge(prev.x,prev.y,prev.p,target.x,target.y,target.p);
-                int oid=ed!=null?ed.oid:guessOid(prev.p,target.p);
-                sendStair(oid,prev.x,prev.y,target.p>prev.p);
-                ctx.log("[实时导航] ↑楼梯 obj="+oid+" p"+prev.p+"->p"+target.p+" try"+interactTries);
+                // ★坐标用 object 真实格 (sx,sy), 不是玩家猜测坐标
+                sendStair(oid,sx,sy,target.p>mp);
+                ctx.log("[实时导航] ↑楼梯 obj="+oid+" @"+sx+","+sy+" p"+mp+"->p"+target.p+" try"+interactTries);
             }
             return;
         }
@@ -2019,6 +2034,20 @@ public final class NavBot implements Plugin {
     private Edge findEdge(int sx,int sy,int sp,int dx,int dy,int dp){
         List<Edge> es=edgeIdx.get(key(sx,sy,sp)); if(es==null)return null;
         for(Edge e:es) if(e.dx==dx&&e.dy==dy&&e.dp==dp)return e; return null;
+    }
+    /** 找所有通往目标跨层点的边(任意源格)，取源格离玩家最近的一条 */
+    private Edge findEdgeTo(int dx,int dy,int dp,int fromP){
+        Edge best=null; int bd=Integer.MAX_VALUE;
+        for(Map.Entry<Long,List<Edge>> en:edgeIdx.entrySet()){
+            List<Edge> es=en.getValue();
+            for(Edge e:es){
+                if(e.dx==dx&&e.dy==dy&&e.dp==dp&&e.sp==fromP){
+                    int d=Math.abs(e.sx-lastX)+Math.abs(e.sy-lastY);
+                    if(d<bd){bd=d;best=e;}
+                }
+            }
+        }
+        return best;
     }
     private int guessOid(int fromP,int toP){
         if(toP>fromP)return fromP==0?16671:(fromP==1?16672:11807);
