@@ -1873,7 +1873,16 @@ public final class NavBot implements Plugin {
                 edgeIdx.computeIfAbsent(key(ed.sx,ed.sy,ed.sp),k->new ArrayList<>()).add(ed);}
         }catch(Throwable e){ctx.log("[实时导航] 数据初始化失败: "+e);finished=true;return;}
         ctx.log("[实时导航] 启动 图"+graph.length+"字节 边"+EDGE_DATA.length+"条");
-        setGoal(3164,3487,0,"GE拍卖行");
+        setGoal(3208,3219,2,"L2");
+        // 自适应: 若当前位置到L2无路径(例如已经在GE区), 直接去GE2, 避免规划失败空转
+        WorldPoint me0=client.getLocalPlayerLocation();
+        if(me0!=null){
+            List<Pt> t0=astar(me0.getX(),me0.getY(),me0.getPlane(),3208,3219,2);
+            if(t0.isEmpty()){
+                ctx.log("[实时导航] 当前位置到L2无路径, 直接规划GE2");
+                reachedL2=true; setGoal(3203,3473,2,"GE2");
+            }
+        }
     }
     public void shutDown(){ctx.log("[实时导航] 停止");}
 
@@ -1971,7 +1980,8 @@ public final class NavBot implements Plugin {
         long t=client.getTickCount();
 
         if((Math.abs(me.getX()-goalX)<=2&&Math.abs(me.getY()-goalY)<=2&&me.getPlane()==goalP)){
-            ctx.log("[实时导航] ★★★★到达终点 GE拍卖行 "+me);finished=true;return;
+            if(!reachedL2){ctx.log("[实时导航] ★★★到达 L2 "+me+" → GE2");reachedL2=true;setGoal(3203,3473,2,"GE2");return;}
+            ctx.log("[实时导航] ★★★★到达终点 GE2 "+me);finished=true;return;
         }
 
         // 卡住检测(坐标无变化)
@@ -2046,12 +2056,13 @@ public final class NavBot implements Plugin {
         for(int j=li;j>=pathIdx;j--){Pt q=path.get(j); if(q.p==me.getPlane()){aim=q;break;}}
         int aimX=aim.x, aimY=aim.y;
 
-        // 卡住侧移: 给目标加垂直偏移, 迫使服务端换一条路(搬自历史成功脚本)
+        // 卡住侧移: 小幅度垂直偏移, 迫使服务端换一条路
+        // ★旧版 off 最大26格, 导致walkTo目标坐标在终点周围疯狂乱跳(3154,3486等), 必须收窄
         int wx=aimX-me.getX(), wy=aimY-me.getY();
         int len=(int)Math.sqrt(wx*wx+wy*wy);
-        if(stuckTicks>=6 && len>0){
+        if(stuckTicks>=10 && len>0){
             double ux=wx/(double)len, uy=wy/(double)len;
-            int off=side*Math.min(9+3*sideAttempts,26);
+            int off=side*(2+Math.min(sideAttempts,2)); // 最多4格
             aimX=(int)Math.round(aimX-uy*off);
             aimY=(int)Math.round(aimY+ux*off);
             if(lastLogTick<0||t-lastLogTick>=20){
