@@ -49,7 +49,6 @@ public final class CloudDemoBot implements Plugin {
     @Subscribe
     public void onTick(GameTick tick) {
         counter++;
-        tryWalkDemo(tick.getTick());
         if (tick.getTick() % 100 != 0) return;
         WorldPoint me = client.getLocalPlayerLocation();
         int npcCount = 0;
