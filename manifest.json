@@ -53,6 +53,16 @@
       "sha256": "dac87dba78c10aee2807b17156591a30667daf88fe47e74b37698e232e551484",
       "class": "ghostdump.GhostDump",
       "entry": "ghostdump.GhostDump"
+    },
+    {
+      "name": "packetsmoke",
+      "desc": "发包端到端冒烟：bank/shop/GE/widget/raw包发出+服务器响应观测",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/packetsmoke.dex",
+      "sha256": "cb38e67d926ea80cdb81a89ff7ed911c4b6445c2ae3c939c3b5034533dd1fc40",
+      "class": "smoke.PacketSmoke",
+      "entry": "smoke.PacketSmoke"
     }
   ],
   "offsets": {
