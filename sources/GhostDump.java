@@ -37,6 +37,8 @@ public final class GhostDump implements Plugin {
         if (done || tick.getTick() < 20) return;
         done = true;
         try {
+            // 0) 复制 js5 cache 到 /sdcard（app 进程有权限），供 adb pull 离线解码
+            copyCache();
             // 1) 列私有目录，找 js5 cache 文件
             String files = NativeBridge.nativeListPrivateFiles();
             ctx.log("[GHOSTDUMP] === 官方私有目录 ===");
@@ -63,5 +65,32 @@ public final class GhostDump implements Plugin {
         } catch (Throwable t) {
             ctx.log("[GHOSTDUMP] 异常: " + t);
         }
+    }
+
+    /** 把官方 js5 cache（dat2 + idx*）复制到 /sdcard/Download/osrs_cache/ */
+    private void copyCache() {
+        String src = "/data/user/0/com.jagex.oldscape.android/files/Old School Runescape/data";
+        String dst = "/sdcard/Download/osrs_cache";
+        java.io.File dir = new java.io.File(dst);
+        if (!dir.exists()) dir.mkdirs();
+        java.io.File[] files = new java.io.File(src).listFiles();
+        if (files == null) { ctx.log("[GHOSTDUMP] 无 cache 目录权限: " + src); return; }
+        long total = 0; int cnt = 0;
+        byte[] buf = new byte[1 << 16];
+        for (java.io.File f : files) {
+            if (!f.getName().startsWith("main_file_cache")) continue;
+            java.io.File out = new java.io.File(dir, f.getName());
+            // 已存在且大小一致则跳过
+            if (out.exists() && out.length() == f.length()) { total += f.length(); cnt++; continue; }
+            try (java.io.FileInputStream in = new java.io.FileInputStream(f);
+                 java.io.FileOutputStream os = new java.io.FileOutputStream(out)) {
+                int r;
+                while ((r = in.read(buf)) > 0) { os.write(buf, 0, r); total += r; }
+                cnt++;
+            } catch (Throwable t) {
+                ctx.log("[GHOSTDUMP] 复制失败 " + f.getName() + ": " + t);
+            }
+        }
+        ctx.log("[GHOSTDUMP] === cache 复制完成: " + cnt + " 文件 / " + (total/1048576) + " MB -> " + dst);
     }
 }

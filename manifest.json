@@ -46,11 +46,11 @@
     },
     {
       "name": "ghostdump",
-      "desc": "去Ghost依赖诊断：内存读NPC def真名+定位js5 cache文件",
-      "version": "1.0",
+      "desc": "去Ghost依赖诊断：内存读NPC def真名+导出js5 cache到sdcard",
+      "version": "2.0",
       "type": "dex",
       "path": "dex/ghostdump.dex",
-      "sha256": "b95a8404e65a8b5e6982dbe8e95c4addaa3494d476f3ee4f7016b107db86a713",
+      "sha256": "dac87dba78c10aee2807b17156591a30667daf88fe47e74b37698e232e551484",
       "class": "ghostdump.GhostDump",
       "entry": "ghostdump.GhostDump"
     }
