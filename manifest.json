@@ -73,6 +73,16 @@
       "sha256": "b2431c6732c459112ed5f278ccad70c88e57a9b719c8704b0daad514a074458e",
       "class": "walktrial.WalkTrial",
       "entry": "walktrial.WalkTrial"
+    },
+    {
+      "name": "routerrunner",
+      "desc": "官方A*寻路:鸡区->L2->GE2",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/routerrunner.dex",
+      "sha256": "2e5a2a13c0dad04c16c162f8379bfaf0521c9eae8d53031abc9f605c15ab613c",
+      "class": "routerunner.RouteRunner",
+      "entry": "routerunner.RouteRunner"
     }
   ],
   "offsets": {
