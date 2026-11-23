@@ -1,132 +1,122 @@
 {
- "repo": "osrs-cloud-local",
- "version": 3,
- "updated": "2026-11-24",
- "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
- "scripts": [
-  {
-   "name": "chicken",
-   "desc": "鸡区打鸡 Java 版（悬浮窗点启动即跑）",
-   "version": "1.0",
-   "type": "java",
-   "entry": "mybot.ChickenBot",
-   "path": "jars/chicken.jar",
-   "sha256": "29b315761ea65e5f150c5096d62efd61f76acb20814b6b25b25c7f6d1a2075e1",
-   "class": "mybot.ChickenBot"
-  },
-  {
-   "name": "myplugin",
-   "desc": "MyPlugin源码版(带诊断日志)",
-   "version": "2.1",
-   "type": "ghost-source",
-   "entry": "myplugin.MyPlugin",
-   "path": "sources/myplugin.java",
-   "sha256": "941b254c9ef5eefa6b3ed00ea207251970e2d2913c851f87ee5020320177db85",
-   "class": "myplugin.MyPlugin"
-  },
-  {
-   "name": "clouddemo",
-   "desc": "云端 dex 真值演示(坐标/登录/NPC 全读到)",
-   "version": "1.1",
-   "type": "dex",
-   "path": "dex/clouddemo.dex",
-   "sha256": "375277de84a1ff65be51a8a06c36a4587e9ca6aa65bc6967e41962db32c42c15",
-   "class": "cloudbot.CloudDemoBot",
-   "entry": "cloudbot.CloudDemoBot"
-  },
-  {
-   "name": "ghostdiag",
-   "desc": "Ghost移植诊断v2：技能/NPC真名/场景物体/背包容器/地面物品",
-   "version": "2.0",
-   "type": "dex",
-   "path": "dex/ghostdiag.dex",
-   "sha256": "d21ae6ce88f5ed81e9f230f116e19d5ad98fc5a5673aaf2c4df726f32fa6a627",
-   "class": "ghostdiag.GhostDiag",
-   "entry": "ghostdiag.GhostDiag"
-  },
-  {
-   "name": "ghostdump",
-   "desc": "去Ghost依赖诊断：内存读NPC def真名+导出js5 cache到sdcard",
-   "version": "2.0",
-   "type": "dex",
-   "path": "dex/ghostdump.dex",
-   "sha256": "dac87dba78c10aee2807b17156591a30667daf88fe47e74b37698e232e551484",
-   "class": "ghostdump.GhostDump",
-   "entry": "ghostdump.GhostDump"
-  },
-  {
-   "name": "packetsmoke",
-   "desc": "发包端到端冒烟：bank/shop/GE/widget/raw包发出+服务器响应观测",
-   "version": "1.0",
-   "type": "dex",
-   "path": "dex/packetsmoke.dex",
-   "sha256": "16e9285e97971abea496c0f0d00c3f6c01b68567bf8b6d99ab1aa2aaf1ad6494",
-   "class": "smoke.PacketSmoke",
-   "entry": "smoke.PacketSmoke"
-  },
-  {
-   "name": "walktrial",
-   "desc": "走路试炼:验证walk包+打印楼梯门物体",
-   "version": "1.0",
-   "type": "dex",
-   "path": "dex/walktrial.dex",
-   "sha256": "b2431c6732c459112ed5f278ccad70c88e57a9b719c8704b0daad514a074458e",
-   "class": "walktrial.WalkTrial",
-   "entry": "walktrial.WalkTrial"
-  },
-  {
-   "name": "routerrunner",
-   "desc": "官方A*寻路:鸡区->L2->GE2",
-   "version": "1.0",
-   "type": "dex",
-   "path": "dex/routerrunner.dex",
-   "sha256": "2e5a2a13c0dad04c16c162f8379bfaf0521c9eae8d53031abc9f605c15ab613c",
-   "class": "routerunner.RouteRunner",
-   "entry": "routerunner.RouteRunner"
-  },
-  {
-   "name": "navbot",
-   "desc": "官方astar3精确复刻(内嵌steps3图+h=0):鸡区->L2->GE2",
-   "version": "2.0",
-   "type": "dex",
-   "path": "dex/navbot.dex",
-   "sha256": "b63cfbc6e745a77b9c8cf0201f906673eaa4f8d10bc1b3ffc7736bffdb48650e",
-   "class": "navbot.NavBot",
-   "entry": "navbot.NavBot"
-  },
-  {
-   "name": "stairprobe",
-   "desc": "楼梯发包暴力探针",
-   "version": "1.0",
-   "type": "dex",
-   "path": "dex/stairprobe.dex",
-   "sha256": "de1fed8162e4636790a97e73d7bcc03e9be9d1f27bc529f6911f605d544e4a4c",
-   "class": "stairprobe.StairProbe",
-   "entry": "stairprobe.StairProbe"
-  },
-  {
-   "name": "objfix",
-   "desc": "验证native object1包换层",
-   "version": "1.0",
-   "type": "dex",
-   "path": "dex/objfix.dex",
-   "sha256": "17b1bd987303165442d928a9d2402e385467e594a49982ba85c129bac25ebbe8",
-   "class": "objfix.ObjFixVerify",
-   "entry": "objfix.ObjFixVerify"
-  },
-  {
-   "name": "objread",
-   "desc": "验证native object读取偏移修复",
-   "version": "1.0",
-   "type": "dex",
-   "path": "dex/objread.dex",
-   "sha256": "12a362595f098676a604d94753ac5f8e3572a46e8194e4af12183635fec294ee",
-   "class": "objread.ObjReadVerify",
-   "entry": "objread.ObjReadVerify"
+  "repo": "osrs-cloud-local",
+  "version": 4,
+  "updated": "2026-11-24",
+  "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
+  "scripts": [
+    {
+      "name": "myplugin",
+      "desc": "MyPlugin源码版(带诊断日志)",
+      "version": "2.1",
+      "type": "ghost-source",
+      "entry": "myplugin.MyPlugin",
+      "path": "sources/myplugin.java",
+      "sha256": "941b254c9ef5eefa6b3ed00ea207251970e2d2913c851f87ee5020320177db85",
+      "class": "myplugin.MyPlugin"
+    },
+    {
+      "name": "clouddemo",
+      "desc": "云端 dex 真值演示(坐标/登录/NPC 全读到)",
+      "version": "1.1",
+      "type": "dex",
+      "path": "dex/clouddemo.dex",
+      "sha256": "375277de84a1ff65be51a8a06c36a4587e9ca6aa65bc6967e41962db32c42c15",
+      "class": "cloudbot.CloudDemoBot",
+      "entry": "cloudbot.CloudDemoBot"
+    },
+    {
+      "name": "ghostdiag",
+      "desc": "Ghost移植诊断v2：技能/NPC真名/场景物体/背包容器/地面物品",
+      "version": "2.0",
+      "type": "dex",
+      "path": "dex/ghostdiag.dex",
+      "sha256": "d21ae6ce88f5ed81e9f230f116e19d5ad98fc5a5673aaf2c4df726f32fa6a627",
+      "class": "ghostdiag.GhostDiag",
+      "entry": "ghostdiag.GhostDiag"
+    },
+    {
+      "name": "ghostdump",
+      "desc": "去Ghost依赖诊断：内存读NPC def真名+导出js5 cache到sdcard",
+      "version": "2.0",
+      "type": "dex",
+      "path": "dex/ghostdump.dex",
+      "sha256": "dac87dba78c10aee2807b17156591a30667daf88fe47e74b37698e232e551484",
+      "class": "ghostdump.GhostDump",
+      "entry": "ghostdump.GhostDump"
+    },
+    {
+      "name": "packetsmoke",
+      "desc": "发包端到端冒烟：bank/shop/GE/widget/raw包发出+服务器响应观测",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/packetsmoke.dex",
+      "sha256": "16e9285e97971abea496c0f0d00c3f6c01b68567bf8b6d99ab1aa2aaf1ad6494",
+      "class": "smoke.PacketSmoke",
+      "entry": "smoke.PacketSmoke"
+    },
+    {
+      "name": "walktrial",
+      "desc": "走路试炼:验证walk包+打印楼梯门物体",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/walktrial.dex",
+      "sha256": "b2431c6732c459112ed5f278ccad70c88e57a9b719c8704b0daad514a074458e",
+      "class": "walktrial.WalkTrial",
+      "entry": "walktrial.WalkTrial"
+    },
+    {
+      "name": "routerrunner",
+      "desc": "官方A*寻路:鸡区->L2->GE2",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/routerrunner.dex",
+      "sha256": "2e5a2a13c0dad04c16c162f8379bfaf0521c9eae8d53031abc9f605c15ab613c",
+      "class": "routerunner.RouteRunner",
+      "entry": "routerunner.RouteRunner"
+    },
+    {
+      "name": "navbot",
+      "desc": "官方astar3精确复刻(内嵌steps3图+h=0):鸡区->L2->GE2",
+      "version": "2.0",
+      "type": "dex",
+      "path": "dex/navbot.dex",
+      "sha256": "b63cfbc6e745a77b9c8cf0201f906673eaa4f8d10bc1b3ffc7736bffdb48650e",
+      "class": "navbot.NavBot",
+      "entry": "navbot.NavBot"
+    },
+    {
+      "name": "stairprobe",
+      "desc": "楼梯发包暴力探针",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/stairprobe.dex",
+      "sha256": "de1fed8162e4636790a97e73d7bcc03e9be9d1f27bc529f6911f605d544e4a4c",
+      "class": "stairprobe.StairProbe",
+      "entry": "stairprobe.StairProbe"
+    },
+    {
+      "name": "objfix",
+      "desc": "验证native object1包换层",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/objfix.dex",
+      "sha256": "17b1bd987303165442d928a9d2402e385467e594a49982ba85c129bac25ebbe8",
+      "class": "objfix.ObjFixVerify",
+      "entry": "objfix.ObjFixVerify"
+    },
+    {
+      "name": "objread",
+      "desc": "验证native object读取偏移修复",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/objread.dex",
+      "sha256": "12a362595f098676a604d94753ac5f8e3572a46e8194e4af12183635fec294ee",
+      "class": "objread.ObjReadVerify",
+      "entry": "objread.ObjReadVerify"
+    }
+  ],
+  "offsets": {
+    "242": "offsets/242.json",
+    "default": "offsets/242.json"
   }
- ],
- "offsets": {
-  "242": "offsets/242.json",
-  "default": "offsets/242.json"
- }
 }
