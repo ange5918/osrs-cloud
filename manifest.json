@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 1,
+  "version": 2,
   "updated": "2026-11-24",
   "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
@@ -33,6 +33,16 @@
       "sha256": "375277de84a1ff65be51a8a06c36a4587e9ca6aa65bc6967e41962db32c42c15",
       "class": "cloudbot.CloudDemoBot",
       "entry": "cloudbot.CloudDemoBot"
+    },
+    {
+      "name": "ghostdiag",
+      "desc": "Ghost移植能力诊断：技能真值/NPC真名/base/地面物品",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/ghostdiag.dex",
+      "sha256": "f19f60f4d3cb2f3c771b65e81a4dad2b19cb24f0bfaa49954d8c87e5a7d2bd90",
+      "class": "ghostdiag.GhostDiag",
+      "entry": "ghostdiag.GhostDiag"
     }
   ],
   "offsets": {
