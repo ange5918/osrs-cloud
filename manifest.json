@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 5,
+  "version": 6,
   "updated": "2026-11-24",
   "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
@@ -13,6 +13,16 @@
       "path": "sources/myplugin.java",
       "sha256": "941b254c9ef5eefa6b3ed00ea207251970e2d2913c851f87ee5020320177db85",
       "class": "myplugin.MyPlugin"
+    },
+    {
+      "name": "navbot",
+      "desc": "官方astar3精确复刻(内嵌steps3图+h=0):鸡区->L2->GE2",
+      "version": "2.0",
+      "type": "dex",
+      "path": "dex/navbot.dex",
+      "sha256": "b63cfbc6e745a77b9c8cf0201f906673eaa4f8d10bc1b3ffc7736bffdb48650e",
+      "class": "navbot.NavBot",
+      "entry": "navbot.NavBot"
     }
   ],
   "offsets": {
