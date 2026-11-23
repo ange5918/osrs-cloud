@@ -26,11 +26,11 @@
     },
     {
       "name": "clouddemo",
-      "desc": "云端 dex 动态加载演示脚本(打印云端标记+坐标心跳)",
-      "version": "1.0",
+      "desc": "云端 dex 真值演示(坐标/登录/NPC 全读到)",
+      "version": "1.1",
       "type": "dex",
       "path": "dex/clouddemo.dex",
-      "sha256": "ad15d79a586335150b1893e209241e550eb1e3e819da42603b3b281dd8781bfb",
+      "sha256": "1306e5572f45a87aa86f86b060e598af05c03f61dbde72097ae9a475f9ad13aa",
       "class": "cloudbot.CloudDemoBot",
       "entry": "cloudbot.CloudDemoBot"
     }

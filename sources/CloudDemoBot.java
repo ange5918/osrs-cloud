@@ -37,8 +37,11 @@ public final class CloudDemoBot implements Plugin {
         counter++;
         if (tick.getTick() % 100 != 0) return;
         WorldPoint me = client.getLocalPlayerLocation();
+        int npcCount = 0;
+        try { npcCount = client.getNpcs().size(); } catch (Throwable ignore) {}
         ctx.log("[云端脚本] 心跳 tick=" + tick.getTick()
             + " 坐标=" + (me == null ? "未登录" : me.getX()+","+me.getY()+","+me.getPlane())
-            + " 登录=" + client.isLoggedIn());
+            + " 登录=" + client.isLoggedIn()
+            + " NPC=" + npcCount);
     }
 }
