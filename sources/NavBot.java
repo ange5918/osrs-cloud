@@ -554,9 +554,8 @@ public final class NavBot implements Plugin {
             }
         }
 
-        // 需要重新规划：无路径 / 走完 / 卡住 / 定期
-        boolean needReplan = path.isEmpty() || pathIdx>=path.size()
-                || stuckTicks>120 || (lastReplanTick>=0 && t-lastReplanTick>=150);
+        // 需要重新规划：无路径 / 走完 / 卡住（不定时重规划，避免打断行走）
+        boolean needReplan = path.isEmpty() || pathIdx>=path.size() || stuckTicks>100;
         if(needReplan){
             List<Pt> p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
             if(p.isEmpty()){
@@ -583,8 +582,13 @@ public final class NavBot implements Plugin {
         if(pathIdx>=path.size()) return;
         Pt target=path.get(pathIdx);
 
-        // 跨层边（plane 变化）-> 发楼梯包
+        // 跨层边（plane 变化）-> 发楼梯包（先走到楼梯格附近）
         if(target.p!=me.getPlane()){
+            int pd=Math.max(Math.abs(target.x-me.getX()),Math.abs(target.y-me.getY()));
+            if(pd>2){
+                if(lastWalkTick<0||t-lastWalkTick>=8){ client.walkTo(target.x,target.y); lastWalkTick=t; }
+                return;
+            }
             if(lastInteractTick<0||t-lastInteractTick>=40){
                 lastInteractTick=t; interactTries++;
                 Pt prev=pathIdx>0?path.get(pathIdx-1):me2pt(me);
@@ -598,14 +602,29 @@ public final class NavBot implements Plugin {
         }
         interactTries=0;
 
-        // 走格：已在容差内 -> 下一格
-        int dx=target.x-me.getX(), dy=target.y-me.getY();
-        int dist=Math.max(Math.abs(dx),Math.abs(dy));
-        if(dist<=1){
+        // 推进 pathIdx：路径上已被走过的点（当前位置附近）
+        while(pathIdx<path.size()){
+            Pt q=path.get(pathIdx);
+            int qd=Math.max(Math.abs(q.x-me.getX()),Math.abs(q.y-me.getY()));
+            if(qd<=2 && q.p==me.getPlane()) pathIdx++; else break;
+        }
+        if(pathIdx>=path.size()) return;
+
+        // ★远点行走：沿路径取前方第 10 格(同plane)作 walk 目标,让客户端自己寻路
+        Pt far=path.get(pathIdx);
+        for(int i=pathIdx+1;i<path.size() && i<pathIdx+14;i++){
+            Pt q=path.get(i);
+            if(q.p!=me.getPlane()) break;          // 遇到跨层就停在这段末尾
+            far=q;
+        }
+        int fdx=far.x-me.getX(), fdy=far.y-me.getY();
+        int fdist=Math.max(Math.abs(fdx),Math.abs(fdy));
+        if(fdist<2 && pathIdx+1<path.size()){
+            // 已很接近远点,推进
             pathIdx++; lastWalkTick=-1; return;
         }
-        if(lastWalkTick<0||t-lastWalkTick>=8){
-            client.walkTo(target.x,target.y);
+        if(lastWalkTick<0||t-lastWalkTick>=10){
+            client.walkTo(far.x,far.y);
             lastWalkTick=t;
         }
     }
