@@ -1,0 +1,44 @@
+package cloudbot;
+
+import com.astrastudio.api.Plugin;
+import com.astrastudio.api.annotation.PluginDescriptor;
+import com.astrastudio.api.annotation.Subscribe;
+import com.astrastudio.api.event.GameTick;
+import com.astrastudio.api.model.Client;
+import com.astrastudio.api.model.WorldPoint;
+
+@PluginDescriptor(
+    name = "云端演示脚本",
+    description = "从云端 dex 动态加载的验证脚本",
+    tags = {"云端", "演示"},
+    enabledByDefault = true
+)
+public final class CloudDemoBot implements Plugin {
+    private PluginContext ctx;
+    private Client client;
+    private long counter = 0;
+
+    public void configure(PluginContext context) {
+        this.ctx = context;
+        this.client = context.getClient();
+    }
+
+    public void startUp() {
+        ctx.log("[云端脚本] ★★★ 我是从云端 dex 动态加载并运行成功的! ★★★");
+        ctx.log("[云端脚本] version=1.0 从 GitHub Pages 下载 → DexClassLoader → PluginManager");
+    }
+
+    public void shutDown() {
+        ctx.log("[云端脚本] 已停止, 共 " + counter + " tick");
+    }
+
+    @Subscribe
+    public void onTick(GameTick tick) {
+        counter++;
+        if (tick.getTick() % 100 != 0) return;
+        WorldPoint me = client.getLocalPlayerLocation();
+        ctx.log("[云端脚本] 心跳 tick=" + tick.getTick()
+            + " 坐标=" + (me == null ? "未登录" : me.getX()+","+me.getY()+","+me.getPlane())
+            + " 登录=" + client.isLoggedIn());
+    }
+}

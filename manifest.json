@@ -1,8 +1,8 @@
 {
   "repo": "osrs-cloud-local",
   "version": 1,
-  "updated": "2026-11-23",
-  "description": "云端脚本仓库（本地演示版；换 HTTP(url) 即为真云端）",
+  "updated": "2026-11-24",
+  "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
     {
       "name": "chicken",
@@ -23,6 +23,16 @@
       "path": "sources/myplugin.java",
       "sha256": "941b254c9ef5eefa6b3ed00ea207251970e2d2913c851f87ee5020320177db85",
       "class": "myplugin.MyPlugin"
+    },
+    {
+      "name": "clouddemo",
+      "desc": "云端 dex 动态加载演示脚本(打印云端标记+坐标心跳)",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/clouddemo.dex",
+      "sha256": "ad15d79a586335150b1893e209241e550eb1e3e819da42603b3b281dd8781bfb",
+      "class": "cloudbot.CloudDemoBot",
+      "entry": "cloudbot.CloudDemoBot"
     }
   ],
   "offsets": {
