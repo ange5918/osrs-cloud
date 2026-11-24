@@ -5571,6 +5571,13 @@ public final class NavBot implements Plugin {
                 int sx=prev.x,sy=prev.y;
                 int[] live=findLiveStair(prev.x,prev.y,target.x,target.y);
                 if(live!=null){oid=live[0];sx=live[1];sy=live[2];}
+                // ★服务器要求站在楼梯相邻格才执行 climb-up。离楼梯>1格先走过去。
+                int sd=Math.max(Math.abs(sx-me.getX()),Math.abs(sy-me.getY()));
+                if(sd>1){
+                    if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(sx,sy);lastWalkTick=t;}
+                    ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
+                    return;
+                }
                 sendStair(oid,sx,sy,target.p>prev.p);
                 ctx.log("[实时导航] ↑楼梯 obj="+oid+(live!=null?"(现场真值)":"(旧edge)")+" @("+sx+","+sy+") p"+prev.p+"->p"+target.p+" try"+interactTries);
             }
@@ -5609,8 +5616,11 @@ public final class NavBot implements Plugin {
                 if(!stair)continue;   // 官方 getName() 已是真实 def 名; Staircase 直接命中
                 if(oid<=0)continue;
                 int x=wp.getX(),y=wp.getY();
-                int d=Math.min(Math.abs(x-px)+Math.abs(y-py),Math.abs(x-tx)+Math.abs(y-ty));
-                if(d<=3&&d<bestD){bestD=d;best=oid;bx=x;by=y;}
+                // 用玩家真实坐标找最近楼梯; 阈值放宽到8格(旧edge锚点可能差好几格)
+                com.astrastudio.api.model.WorldPoint pm=client.getLocalPlayerLocation();
+                int mx=pm==null?px:pm.getX(), my=pm==null?py:pm.getY();
+                int d=Math.min(Math.abs(x-mx)+Math.abs(y-my),Math.abs(x-px)+Math.abs(y-py));
+                if(d<=8&&d<bestD){bestD=d;best=oid;bx=x;by=y;}
             }
         }catch(Throwable e){}
         return best>0?new int[]{best,bx,by}:null;
