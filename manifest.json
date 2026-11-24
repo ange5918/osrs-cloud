@@ -50,7 +50,7 @@
       "version": "1.0",
       "type": "dex",
       "path": "dex/objprobe.dex",
-      "sha256": "c21796a09d7a336f33c8ab6bc6d175dbfc485bd0bbe0afea594b7f5f1ded5241",
+      "sha256": "67d5a77b664385c77deeb13bad9184be1cbefc548e121492e962c72b83a62b95",
       "class": "objprobe.ObjProbe",
       "entry": "objprobe.ObjProbe"
     }
