@@ -4085,11 +4085,12 @@ public final class NavBot implements Plugin {
                 edgeIdx.computeIfAbsent(key(ed.sx,ed.sy,ed.sp),k->new ArrayList<>()).add(ed);}
         }catch(Throwable e){ctx.log("[实时导航] 数据初始化失败: "+e);finished=true;return;}
         ctx.log("[实时导航] 启动 官方全图块"+blockKeys.length+"块 "+packedBlocks.length+"字节 边"+EDGE_DATA.length+"条");
-        // ★断点续走: 若已在去GE2途中(y>=3250)或已到GE区, 直接奔GE2, 不回头去L2(避免反复穿越断线区)
+        // ★断点续走: 只要不在L2出发区(距L2<=12格)就直奔GE2, 不回头(避免反复穿越断线区)
         WorldPoint st=client.getLocalPlayerLocation();
-        if(st!=null && st.getY()>=3250){
+        int dl2 = (st==null)?0:(Math.abs(st.getX()-3208)+Math.abs(st.getY()-3219));
+        if(st!=null && dl2>12){
             reachedL2=true; setGoal(3203,3473,2,"GE2");
-            ctx.log("[实时导航] ★断点续走: 当前"+st+" 直奔GE2");
+            ctx.log("[实时导航] ★断点续走: 当前"+st+" 距L2="+dl2+" 直奔GE2");
         }else{
             setGoal(3208,3219,2,"L2");
         }
