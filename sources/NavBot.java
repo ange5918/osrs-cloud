@@ -5573,11 +5573,15 @@ public final class NavBot implements Plugin {
                 ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
                 return;
             }
-            // 已站楼梯旁: 节流发 climb (用现场 oid+坐标)
+            // 已站楼梯旁: 节流发 climb
             if(lastInteractTick<0||t-lastInteractTick>=40){
                 lastInteractTick=t;interactTries++;
-                sendStair(oid,sx,sy,target.p>prev.p);
-                ctx.log("[实时导航] ↑楼梯 obj="+oid+(live!=null?"(现场真值)":"(旧edge)")+" @("+sx+","+sy+") p"+prev.p+"->p"+target.p+" try"+interactTries);
+                // ★发送前即时重扫现场 Staircase, 强制用真oid(56230), 绝不发旧16672
+                int[] now=findLiveStair(me.getX(),me.getY(),sx,sy);
+                if(now!=null){oid=now[0];}
+                // op88 坐标用玩家当前站位(真包语义: 玩家点楼梯时发自己所在格)
+                sendStair(oid,me.getX(),me.getY(),target.p>prev.p);
+                ctx.log("[实时导航] ↑楼梯 obj="+oid+(now!=null?"(现场真值)":"(旧edge)")+" @玩家"+me.getX()+","+me.getY()+" p"+prev.p+"->p"+target.p+" try"+interactTries);
             }
             return;
         }
