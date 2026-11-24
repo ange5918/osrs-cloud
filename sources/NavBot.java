@@ -4220,10 +4220,10 @@ public final class NavBot implements Plugin {
             //   p2->p1: 56231 (Climb-down=slot0 -> opt1/op88) ; p1->p0: 16672 (Climb-down=slot2 -> opt3)
             int oid;
             int ax,ay; // ★交互锚点必须按方向/层区分(真包逐个验证过)
-            if(target.oid>0){
-                // ★优先用路径跨层边自带的真实 object id + 起点锚点 (GE楼梯11807等, 不再hardcode Lumbridge)
+            if(target.oid>0 && target.ey>=3400){
+                // ★GE区(y>=3400)跨层边: 用边自带真实oid+锚点(11807等, Lumbridge硬编码在此不适用)
                 oid=target.oid; ax=target.ex; ay=target.ey;
-                ctx.log("[实时导航] ★跨层边自带oid="+oid+" 锚点"+ax+","+ay);
+                ctx.log("[实时导航] ★GE跨层边oid="+oid+" 锚点"+ax+","+ay);
             }else if(up){
                 oid = (me.getPlane()==0)?56230:(me.getPlane()==1?16672:11801);
                 ax=3204;ay=3207;                       // 上楼锚点(56230/16672 共用)
