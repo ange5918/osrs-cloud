@@ -4247,10 +4247,14 @@ public final class NavBot implements Plugin {
             //   p1->p2: 16672 (actions=[Climb,Climb-up,Climb-down], Climb-up=slot1 -> opt2/op72) 已真包验证
             //   p2->p1: 56231 (Climb-down=slot0 -> opt1/op88) ; p1->p0: 16672 (Climb-down=slot2 -> opt3)
             int oid;
-            if(up) oid = (me.getPlane()==0)?56230:(me.getPlane()==1?16672:11801);
-            else   oid = (me.getPlane()==2)?56231:(me.getPlane()==1?16672:56230);
-            // 交互锚点: 真包验证过的楼梯格 (3204,3207); 玩家离太远先走过去
-            int ax=3204,ay=3207;
+            int ax,ay; // ★交互锚点必须按方向/层区分(真包逐个验证过)
+            if(up){
+                oid = (me.getPlane()==0)?56230:(me.getPlane()==1?16672:11801);
+                ax=3204;ay=3207;                       // 上楼锚点(56230/16672 共用)
+            }else{
+                if(me.getPlane()==2){oid=56231;ax=3205;ay=3208;} // p2->p1: 56231@(3205,3208) 真包验证
+                else{oid=(me.getPlane()==1)?16672:56230;ax=3204;ay=3207;} // p1->p0
+            }
             int sd=Math.max(Math.abs(ax-me.getX()),Math.abs(ay-me.getY()));
             if(sd>3){
                 if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(ax,ay);lastWalkTick=t;}
