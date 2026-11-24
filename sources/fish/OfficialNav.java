@@ -5427,6 +5427,7 @@ final class OfficialNav {
     private long lastWalkTick=-1,lastLogTick=-1,lastInteractTick=-1,legStartTick=-1;
     private int stuckTicks=0,lastX=-1,lastY=-1,interactTries=0;
     private boolean ready=false;
+    boolean lastPlanFailed=false;   // 最近一次规划是否失败(图空洞区)
 
     OfficialNav(Client client, Plugin.PluginContext ctx){ this.client=client; this.ctx=ctx; }
 
@@ -5471,7 +5472,32 @@ final class OfficialNav {
         return m;
     }
 
+    /** 起点吸附: 玩家常站在图的 0 邻居孤岛 tile 上(如 GE 某些点), 找半径内最近的可走节点。 */
+    private Pt snapStart(int sx,int sy,int sp){
+        int[] probe=new int[8*4];
+        if(steps3(sx,sy,sp,probe)>0) return new Pt(sx,sy,sp);
+        for(int r=1;r<=10;r++){
+            Pt bestP=null; int bestD=Integer.MAX_VALUE;
+            for(int dx=-r;dx<=r;dx++) for(int dy=-r;dy<=r;dy++){
+                if(Math.max(Math.abs(dx),Math.abs(dy))!=r) continue;  // 只看环
+                for(int p=0;p<PL;p++){
+                    int x=sx+dx,y=sy+dy;
+                    if(x<X0||x>X1||y<Y0||y>Y1) continue;
+                    if(steps3(x,y,p,probe)>0){
+                        int d=Math.abs(dx)+Math.abs(dy)+Math.abs(p-sp);
+                        if(d<bestD){bestD=d;bestP=new Pt(x,y,p);}
+                    }
+                }
+            }
+            if(bestP!=null){ctx.log("[官方寻路] 起点吸附 ("+sx+","+sy+",p"+sp+") -> ("+bestP.x+","+bestP.y+",p"+bestP.p+")");return bestP;}
+        }
+        return new Pt(sx,sy,sp);  // 找不到就原样, 规划大概率失败
+    }
+
     private List<Pt> astar(int sx,int sy,int sp,int gx,int gy,int gp){
+        // 起点吸附: 0 邻居孤岛 -> 最近可走节点作为规划起点
+        Pt snap=snapStart(sx,sy,sp);
+        sx=snap.x; sy=snap.y; sp=snap.p;
         final long GOAL=key(gx,gy,gp);
         PriorityQueue<Pt> open=new PriorityQueue<>(new Comparator<Pt>(){
             public int compare(Pt a,Pt b){
@@ -5523,9 +5549,11 @@ final class OfficialNav {
         if(needReplan){
             List<Pt> p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
             if(p.isEmpty()){
+                lastPlanFailed=true;
                 if(t-lastLogTick>=100){lastLogTick=t;ctx.log("[官方寻路] 规划失败 "+me+" -> "+goalName);}
                 stuckTicks=0; return true;
             }
+            lastPlanFailed=false;
             path=p;pathIdx=0;stuckTicks=0;lastWalkTick=-1;
             ctx.log("[官方寻路] 规划 "+p.size()+"步 "+me.getX()+","+me.getY()+",p"+me.getPlane()+" -> "+goalName);
         }

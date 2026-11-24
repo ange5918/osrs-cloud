@@ -65,6 +65,11 @@ public final class Fish implements Plugin {
     private boolean resting = false;
     private Coord lastCoord = null;          // 用于近似 isMoving()
 
+    // 寻路兜底: navbot 图不覆盖 GE 区, 规划失败时改用客户端 walk dispatcher 自带寻路
+    private int navFailTicks = 0;
+    private Coord lastNavPos = null;
+    private long lastDirectWalk = -1;
+
     @Override
     public void configure(PluginContext context) {
         this.ctx = context;
@@ -258,9 +263,23 @@ public final class Fish implements Plugin {
 
         final Place mine = placeFromBottomLeft("杀鸡", new Coord(3173, 3289, 0), 12, 15);
 
-        // ===== 不在鸡区：交给官方 astar3 寻路走过去（逐 tick 驱动，含楼梯/跨层交互）=====
+        // ===== 不在鸡区：交给官方寻路走过去 =====
         if (!mine.contains(here)) {
             if (nav != null) nav.tick(meWp);
+            // 图空洞区(如 GE)规划失败 -> 兜底: OSRS 客户端 walk dispatcher 自带寻路,
+            // 直接发终点坐标即可, 低频重发避免 flood。
+            if (nav == null || nav.lastPlanFailed) {
+                long t = client.getTickCount();
+                boolean moved = lastNavPos == null
+                        || lastNavPos.x != here.x || lastNavPos.y != here.y;
+                if (!moved) navFailTicks++; else navFailTicks = 0;
+                lastNavPos = here;
+                if (navFailTicks >= 5 && (lastDirectWalk < 0 || t - lastDirectWalk >= 30)) {
+                    lastDirectWalk = t;
+                    client.walkTo(MINE_X, MINE_Y);
+                    log("官方寻路图无覆盖 -> 客户端自带寻路走向鸡区 (" + MINE_X + "," + MINE_Y + ") 当前 " + here);
+                }
+            }
             return;
         }
 
