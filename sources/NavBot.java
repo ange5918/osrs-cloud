@@ -5595,20 +5595,22 @@ public final class NavBot implements Plugin {
     private int[] findLiveStair(int px,int py,int tx,int ty){
         int best=-1,bestD=100,bx=0,by=0;
         try{
-            java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
-            if(all==null)return null;
-            for(java.util.Map<String,Object> m:all){
-                int x=m.get("x") instanceof Number?((Number)m.get("x")).intValue():0;
-                int y=m.get("y") instanceof Number?((Number)m.get("y")).intValue():0;
-                int id=m.get("id") instanceof Number?((Number)m.get("id")).intValue():0;
-                String name=String.valueOf(m.getOrDefault("name","")).toLowerCase();
+            // ★不依赖 GhostRuntime(该类没打进 dex, 运行时 NoClassDefFoundError 被吞 -> 旧oid卡死)。
+            //   直接用 PluginContext 自带的官方 client.getTileObjects() 现场真值。
+            java.util.List<com.astrastudio.api.model.TileObject> objs=client.getTileObjects();
+            if(objs==null)return null;
+            for(com.astrastudio.api.model.TileObject o:objs){
+                if(o==null)continue;
+                com.astrastudio.api.model.WorldPoint wp=o.getWorldLocation();
+                if(wp==null)continue;
+                int oid=o.getId();
+                String name=o.getName()==null?"":o.getName().toLowerCase();
                 boolean stair=name.contains("stair")||name.contains("ladder")||name.contains("trapdoor")||name.contains("hatch");
-                Object raw=m.get("actions");
-                if(!stair&&raw instanceof java.util.List)
-                    for(Object a:(java.util.List<?>)raw) if(a!=null&&String.valueOf(a).toLowerCase().startsWith("climb")){stair=true;break;}
-                if(!stair||id<=0)continue;
+                if(!stair)continue;   // 官方 getName() 已是真实 def 名; Staircase 直接命中
+                if(oid<=0)continue;
+                int x=wp.getX(),y=wp.getY();
                 int d=Math.min(Math.abs(x-px)+Math.abs(y-py),Math.abs(x-tx)+Math.abs(y-ty));
-                if(d<=3&&d<bestD){bestD=d;best=id;bx=x;by=y;}
+                if(d<=3&&d<bestD){bestD=d;best=oid;bx=x;by=y;}
             }
         }catch(Throwable e){}
         return best>0?new int[]{best,bx,by}:null;
