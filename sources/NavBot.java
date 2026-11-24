@@ -5559,25 +5559,23 @@ public final class NavBot implements Plugin {
 
         // 跨层 -> 楼梯交互
         if(target.p!=me.getPlane()){
-            int pd=Math.max(Math.abs(target.x-me.getX()),Math.abs(target.y-me.getY()));
-            if(pd>2){ if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(target.x,target.y);lastWalkTick=t;} return; }
+            Pt prev=pathIdx>0?path.get(pathIdx-1):new Pt(me.getX(),me.getY(),me.getPlane());
+            Edge ed=findEdge(prev.x,prev.y,prev.p,target.x,target.y,target.p);
+            int oid=ed!=null?ed.oid:guessOid(prev.p,target.p);
+            int sx=prev.x,sy=prev.y;
+            // ★现场楼梯真值覆盖旧edge锚点(1667x失效); 走路/交互统一用现场坐标, 消除旧锚点拉回震荡
+            int[] live=findLiveStair(prev.x,prev.y,target.x,target.y);
+            if(live!=null){oid=live[0];sx=live[1];sy=live[2];}
+            int sd=Math.max(Math.abs(sx-me.getX()),Math.abs(sy-me.getY()));
+            // 服务器要求站楼梯相邻格: 一律先走到现场楼梯旁(用现场坐标, 不再用旧target锚点)
+            if(sd>1){
+                if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(sx,sy);lastWalkTick=t;}
+                ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
+                return;
+            }
+            // 已站楼梯旁: 节流发 climb (用现场 oid+坐标)
             if(lastInteractTick<0||t-lastInteractTick>=40){
                 lastInteractTick=t;interactTries++;
-                Pt prev=pathIdx>0?path.get(pathIdx-1):new Pt(me.getX(),me.getY(),me.getPlane());
-                Edge ed=findEdge(prev.x,prev.y,prev.p,target.x,target.y,target.p);
-                int oid=ed!=null?ed.oid:guessOid(prev.p,target.p);
-                // ★v242修复: EDGE_DATA/guessOid 的楼梯oid(16671/16672)是旧版, 客户端真值如56230@(3204,3207)。
-                //   现场从 Ghost API objects() 读真实 id+坐标覆盖, 否则 climb-up 服务器不执行。
-                int sx=prev.x,sy=prev.y;
-                int[] live=findLiveStair(prev.x,prev.y,target.x,target.y);
-                if(live!=null){oid=live[0];sx=live[1];sy=live[2];}
-                // ★服务器要求站在楼梯相邻格才执行 climb-up。离楼梯>1格先走过去。
-                int sd=Math.max(Math.abs(sx-me.getX()),Math.abs(sy-me.getY()));
-                if(sd>1){
-                    if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(sx,sy);lastWalkTick=t;}
-                    ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
-                    return;
-                }
                 sendStair(oid,sx,sy,target.p>prev.p);
                 ctx.log("[实时导航] ↑楼梯 obj="+oid+(live!=null?"(现场真值)":"(旧edge)")+" @("+sx+","+sy+") p"+prev.p+"->p"+target.p+" try"+interactTries);
             }
