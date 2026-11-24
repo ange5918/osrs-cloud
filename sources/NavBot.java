@@ -4053,6 +4053,8 @@ public final class NavBot implements Plugin {
     }
     private static final class Pt {
         int x,y,p; double g;
+        int oid=-1;       // ★跨层边自带真实 object id (GE 楼梯 11807 等)
+        int ex=-1,ey=-1;  // ★跨层边起点锚点 (楼梯 object 所在格), 交互发包用
         Pt(int x,int y,int p){this.x=x;this.y=y;this.p=p;}
         public boolean equals(Object o){if(!(o instanceof Pt))return false;Pt q=(Pt)o;
             return x==q.x&&y==q.y&&p==q.p;}
@@ -4157,13 +4159,16 @@ public final class NavBot implements Plugin {
             int total=n+(cross==null?0:cross.size());
             for(int i=0;i<total;i++){
                 int nx,ny,np,cost;
+                int eoid=-1, eex=-1, eey=-1; // ★跨层边真实 oid/锚点, 带进 Pt 供交互发包
                 if(i<n){nx=nb[i*4];ny=nb[i*4+1];np=nb[i*4+2];cost=nb[i*4+3];}
-                else{Edge e=cross.get(i-n);nx=e.dx;ny=e.dy;np=e.dp;cost=1;}
+                else{Edge e=cross.get(i-n);nx=e.dx;ny=e.dy;np=e.dp;cost=1;
+                     eoid=e.oid; eex=e.sx; eey=e.sy;}
                 double ng=c.g+cost;
                 long nk=key(nx,ny,np);
                 PtState old=best.get(nk);
                 if(old==null||ng<old.p.g-1e-6){
                     Pt nn=new Pt(nx,ny,np); nn.g=ng;
+                    nn.oid=eoid; nn.ex=eex; nn.ey=eey;
                     best.put(nk,new PtState(nn,cs)); open.add(nn);
                 }
             }
@@ -4215,7 +4220,11 @@ public final class NavBot implements Plugin {
             //   p2->p1: 56231 (Climb-down=slot0 -> opt1/op88) ; p1->p0: 16672 (Climb-down=slot2 -> opt3)
             int oid;
             int ax,ay; // ★交互锚点必须按方向/层区分(真包逐个验证过)
-            if(up){
+            if(target.oid>0){
+                // ★优先用路径跨层边自带的真实 object id + 起点锚点 (GE楼梯11807等, 不再hardcode Lumbridge)
+                oid=target.oid; ax=target.ex; ay=target.ey;
+                ctx.log("[实时导航] ★跨层边自带oid="+oid+" 锚点"+ax+","+ay);
+            }else if(up){
                 oid = (me.getPlane()==0)?56230:(me.getPlane()==1?16672:11801);
                 ax=3204;ay=3207;                       // 上楼锚点(56230/16672 共用)
             }else{
