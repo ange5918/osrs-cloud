@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 8,
+  "version": 9,
   "updated": "2026-11-24",
   "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
@@ -26,11 +26,11 @@
     },
     {
       "name": "fish",
-      "desc": "fish脚本工程模板(读坐标/实体+文件启停)",
-      "version": "1.0",
+      "desc": "Ghost API 真值门面 + 官方astar3寻路 杀鸡脚本",
+      "version": "2.0",
       "type": "dex",
       "path": "dex/fish.dex",
-      "sha256": "21aa5a535fb7aec242832ad0b5d24d5830d59c9a184b22c825b0a3d8e1dcd977",
+      "sha256": "477c039973e771991219b597d6993919fe904a14ba1cf87b27a1698c523432cc",
       "class": "fish.Fish",
       "entry": "fish.Fish"
     }
