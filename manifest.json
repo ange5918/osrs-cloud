@@ -43,6 +43,16 @@
       "sha256": "9082c2a52e5d81f2763e34adb4c1c90d4d2c31b16557c100fb5345fc80774e03",
       "class": "e2e.E2E",
       "entry": "e2e.E2E"
+    },
+    {
+      "name": "objprobe",
+      "desc": "受控探针: scan附近object / click oid [slot]",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/objprobe.dex",
+      "sha256": "c21796a09d7a336f33c8ab6bc6d175dbfc485bd0bbe0afea594b7f5f1ded5241",
+      "class": "objprobe.ObjProbe",
+      "entry": "objprobe.ObjProbe"
     }
   ],
   "offsets": {
