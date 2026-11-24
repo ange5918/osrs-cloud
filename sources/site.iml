@@ -16,6 +16,16 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <!-- APK 内的完整编译产物: com.ghost.api(258类) + osrs4j + com.astrastudio.nav.OfficialNav + org.json + com.astrastudio.api -->
+    <orderEntry type="module-library">
+      <library>
+        <CLASSES>
+          <root url="file://D:/ghostport_build/classes" />
+        </CLASSES>
+        <JAVADOC />
+        <SOURCES />
+      </library>
+    </orderEntry>
     <orderEntry type="module-library">
       <library>
         <CLASSES>

@@ -72,10 +72,13 @@ public final class Fish implements Plugin {
     private String lastCmd = "";
     private int poll = 0;
     private int restLeft = 0;                // 对应 Ghost Wait.ticks(4,5) 的攻击后休息
-    // 官方寻路图空洞区(如 GE)规划失败时的兜底: Ghost Walker.walkTo 低频重发
+    // 官方寻路图空洞区(如 GE)规划失败时的兜底: 动态前瞻点分段走
+    // OSRS 客户端只接受加载区(~20格)内的目标, 直发190格外的终点会撞墙停住;
+    // 必须不断把目标前移到近处, 让客户端自己分段寻路绕墙。
     private long lastDirectWalk = -1;
     private Coord lastNavPos = null;
     private int navFailTicks = 0;
+    private int sidestep = 0;   // 卡住时垂直侧移方向(绕墙), 每次卡住翻转
 
     @Override
     public void configure(PluginContext context) {
@@ -128,6 +131,27 @@ public final class Fish implements Plugin {
         ctx.log("[Fish] " + s);
     }
 
+    /**
+     * 朝目标取一个加载区内的近点(约18格)作为本次 walk 目标。
+     * OSRS 客户端单次点击只接受已加载地图(~20格)内的目标, 超过则直线走到边缘停住。
+     * 分段不断前移, 客户端自己寻路绕墙。撞墙(sidestep!=0)时加垂直偏移绕行。
+     */
+    private Coord walkStepTowards(Coord from, int tx, int ty) {
+        int dx = tx - from.x(), dy = ty - from.y();
+        double len = Math.sqrt(dx * dx + dy * dy);
+        int step = 18;
+        if (len <= step) return new Coord(tx, ty, from.floor());
+        double ux = dx / len, uy = dy / len;
+        int nx = from.x() + (int) Math.round(ux * step);
+        int ny = from.y() + (int) Math.round(uy * step);
+        if (sidestep != 0) {
+            // 垂直方向偏移 ~8 格绕墙: 垂直向量 (-uy, ux)
+            nx += (int) Math.round(-uy * 8 * sidestep);
+            ny += (int) Math.round(ux * 8 * sidestep);
+        }
+        return new Coord(nx, ny, from.floor());
+    }
+
     @Subscribe
     public void onTick(GameTick tick) {
         pollCommand();
@@ -149,16 +173,19 @@ public final class Fish implements Plugin {
         if (!mine.contains(here)) {
             WorldPoint meWp = client.getLocalPlayerLocation();
             if (nav != null && meWp != null) nav.tick(meWp);
-            // 图空洞区(GE等)规划失败 -> Ghost Walker 兜底直发终点, 低频重发避免 flood
+            // 图空洞区(GE等)规划失败 -> 动态前瞻点分段走(见 walkStepTowards 注释)
             if (nav == null || nav.lastPlanFailed) {
                 boolean moved = lastNavPos == null || lastNavPos.x() != here.x() || lastNavPos.y() != here.y();
                 navFailTicks = moved ? 0 : navFailTicks + 1;
                 lastNavPos = here;
+                // 连续多轮不动 = 撞墙, 翻转垂直侧移方向绕行
+                if (navFailTicks >= 6) { sidestep = (sidestep == 0 || sidestep > 0) ? -1 : 1; navFailTicks = 0; }
                 long t = tick.getTick();
-                if (navFailTicks >= 5 && (lastDirectWalk < 0 || t - lastDirectWalk >= 30)) {
+                if (t - lastDirectWalk >= 15) {   // 300ms 重发一次前瞻点
                     lastDirectWalk = t;
-                    Walker.walkTo(MINE_X, MINE_Y);
-                    log("官方寻路无覆盖 -> Ghost Walker 兜底走向鸡区 (" + MINE_X + "," + MINE_Y + ") 当前 " + here);
+                    Coord aim = walkStepTowards(here, MINE_X, MINE_Y);
+                    Walker.walkTo(aim.x(), aim.y());
+                    log("兜底前瞻 -> " + aim + " 侧移=" + sidestep + " 当前 " + here);
                 }
             }
             return;
