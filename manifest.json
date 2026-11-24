@@ -1,18 +1,68 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 2,
-  "updated": "2026-11-23",
-  "description": "云端脚本仓库（本地演示版；换 HTTP(url) 即为真云端）",
+  "version": 13,
+  "updated": "2026-11-24",
+  "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
     {
       "name": "myplugin",
-      "desc": "MyPlugin源码版(带诊断日志)",
-      "version": "2.1",
-      "type": "ghost-source",
+      "desc": "AstraStudio版杀鸡脚本(真正dex,可动态加载)",
+      "version": "2.2",
+      "type": "dex",
       "entry": "myplugin.MyPlugin",
-      "path": "sources/myplugin.java",
-      "sha256": "941b254c9ef5eefa6b3ed00ea207251970e2d2913c851f87ee5020320177db85",
+      "path": "dex/myplugin.dex",
+      "sha256": "b3c7c8c805bc8e540e89ea0347e2a8a466871a431e62424bede6c387c9b1aded",
       "class": "myplugin.MyPlugin"
+    },
+    {
+      "name": "navbot",
+      "desc": "官方astar3精确复刻(内嵌steps3图+h=0):鸡区->L2->GE2",
+      "version": "2.14",
+      "type": "dex",
+      "path": "dex/navbot.dex",
+      "sha256": "f14a7f420f77bb64a18d3d37ac9dd5538b85fffcc828333650a010afb40c1807",
+      "class": "navbot.NavBot",
+      "entry": "navbot.NavBot"
+    },
+    {
+      "name": "fish",
+      "desc": "Ghost API 真值门面 + 官方astar3寻路 杀鸡脚本",
+      "version": "2.0",
+      "type": "dex",
+      "path": "dex/fish.dex",
+      "sha256": "4058c163b7a0ae938a6235f21a079ca2020b1f40203cd6fac28b7365893a5286",
+      "class": "fish.Fish",
+      "entry": "fish.Fish"
+    },
+    {
+      "name": "e2e",
+      "desc": "全程Ghost API: L2取5coins->商店买1hammer",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/e2e.dex",
+      "sha256": "9082c2a52e5d81f2763e34adb4c1c90d4d2c31b16557c100fb5345fc80774e03",
+      "class": "e2e.E2E",
+      "entry": "e2e.E2E"
+    },
+    {
+      "name": "objprobe",
+      "desc": "受控探针: scan附近object / click oid [slot]",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/objprobe.dex",
+      "sha256": "67d5a77b664385c77deeb13bad9184be1cbefc548e121492e962c72b83a62b95",
+      "class": "objprobe.ObjProbe",
+      "entry": "objprobe.ObjProbe"
+    },
+    {
+      "name": "objprobe2",
+      "desc": "受控探针v2: 文件输出+clicknear+最近id",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/objprobe2.dex",
+      "sha256": "365030444c0eecb7fe1cdcd37826aaf11528278e0ac08e2f47a9b5190fab6b3f",
+      "class": "objprobe2.ObjProbe2",
+      "entry": "objprobe2.ObjProbe2"
     }
   ],
   "offsets": {
