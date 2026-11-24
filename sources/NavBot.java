@@ -5577,42 +5577,32 @@ public final class NavBot implements Plugin {
         if(pathIdx>=path.size())return;
         Pt target=path.get(pathIdx);
 
-        // 跨层 -> 楼梯交互
+        // 跨层 -> 楼梯交互 (★按官方规则: oid=分层真值, slot=actions.index, opt=slot+1)
         if(target.p!=me.getPlane()){
             Pt prev=pathIdx>0?path.get(pathIdx-1):new Pt(me.getX(),me.getY(),me.getPlane());
-            Edge ed=findEdge(prev.x,prev.y,prev.p,target.x,target.y,target.p);
-            int oid=ed!=null?ed.oid:guessOid(prev.p,target.p);
-            int sx=prev.x,sy=prev.y;
-            // ★现场取 id 仅 p0 可信: 端上 getTileObjects() plane 硬编码0(见 GameClientImpl:127),
-            //   p1+ 现场扫到的是 p0 楼梯(56230), 会覆盖掉正确的分层oid(16672) -> 又发op88上不去。
-            //   官方 objects.near(mp,...) 按 plane 过滤, 端上没有该保证, 故 p1+ 只用路径边分层oid。
-            int[] live=null;
-            if(me.getPlane()==0){
-                live=findLiveStair(prev.x,prev.y,target.x,target.y);
-                if(live!=null){oid=live[0];sx=live[1];sy=live[2];}
-            }
-            int sd=Math.max(Math.abs(sx-me.getX()),Math.abs(sy-me.getY()));
-            // 服务器要求站楼梯附近: 真包验证距2格也能上楼; 放宽阈值避免跨层walkTo无效卡死
-            if(sd>2){
-                if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(sx,sy);lastWalkTick=t;}
-                ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
+            boolean up=target.p>me.getPlane();
+            // ★离线分层 oid 真值 (端上 getTileObjects plane 硬编码0, 现场坐标错位不可用):
+            //   p0->p1: 56230 (actions=[Climb-up,Top-floor], Climb-up=slot0 -> opt1/op88) 已真包验证
+            //   p1->p2: 16672 (actions=[Climb,Climb-up,Climb-down], Climb-up=slot1 -> opt2/op72) 已真包验证
+            //   p2->p1: 56231 (Climb-down=slot0 -> opt1/op88) ; p1->p0: 16672 (Climb-down=slot2 -> opt3)
+            int oid;
+            if(up) oid = (me.getPlane()==0)?56230:(me.getPlane()==1?16672:11801);
+            else   oid = (me.getPlane()==2)?56231:(me.getPlane()==1?16672:56230);
+            // 交互锚点: 真包验证过的楼梯格 (3204,3207); 玩家离太远先走过去
+            int ax=3204,ay=3207;
+            int sd=Math.max(Math.abs(ax-me.getX()),Math.abs(ay-me.getY()));
+            if(sd>3){
+                if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(ax,ay);lastWalkTick=t;}
+                ctx.log("[实时导航] →靠近楼梯 ("+ax+","+ay+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
                 return;
             }
-            // 已站楼梯旁: 节流发 climb
             if(lastInteractTick<0||t-lastInteractTick>=40){
                 lastInteractTick=t;interactTries++;
-                // ★发送前即时重扫现场 Staircase(仅 p0): p1+ 用路径边分层oid(16672→op72)
-                int[] now=null;
-                if(me.getPlane()==0){
-                    now=findLiveStair(me.getX(),me.getY(),sx,sy);
-                    if(now!=null){oid=now[0];}
-                }
-                int opt=climbOpt(oid,target.p>prev.p);
-                // payload 坐标用玩家当前站位(真包语义: 玩家点楼梯时发自己所在格)
-                sendStair(oid,me.getX(),me.getY(),target.p>prev.p);
-                ctx.log("[实时导航] ↑楼梯 obj="+oid+" opt"+opt+(opt==2?"(op72)":"(op88)")+
-                    (now!=null?"(现场真值)":"(分层oid)")+" @玩家"+me.getX()+","+me.getY()+
-                    " p"+prev.p+"->p"+target.p+" try"+interactTries);
+                int opt=climbOpt(oid,up);
+                // payload 坐标用玩家当前站位 (真包语义: 玩家点楼梯时发自己所在格)
+                sendStair(oid,me.getX(),me.getY(),up);
+                ctx.log("[实时导航] ↑楼梯 obj="+oid+" opt"+opt+(opt==2?"(op72)":opt==1?"(op88)":"(op"+opt+")")+
+                    "(分层真值) @玩家"+me.getX()+","+me.getY()+" p"+me.getPlane()+"->"+target.p+" try"+interactTries);
             }
             return;
         }
