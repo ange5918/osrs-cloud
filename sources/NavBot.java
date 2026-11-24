@@ -5599,10 +5599,12 @@ public final class NavBot implements Plugin {
             if(lastInteractTick<0||t-lastInteractTick>=40){
                 lastInteractTick=t;interactTries++;
                 int opt=climbOpt(oid,up);
-                // payload 坐标用玩家当前站位 (真包语义: 玩家点楼梯时发自己所在格)
-                sendStair(oid,me.getX(),me.getY(),up);
+                // ★payload 坐标用楼梯锚点 (3204,3207), 与手动点击真包逐字节一致:
+                //   clickxy 56230 3204 3207 0 -> plane0→1 成功; 玩家站位坐标3格外服务器不执行。
+                sendStair(oid,ax,ay,up);
                 ctx.log("[实时导航] ↑楼梯 obj="+oid+" opt"+opt+(opt==2?"(op72)":opt==1?"(op88)":"(op"+opt+")")+
-                    "(分层真值) @玩家"+me.getX()+","+me.getY()+" p"+me.getPlane()+"->"+target.p+" try"+interactTries);
+                    "(分层真值) @"+(up?"上":"下")+"楼锚点"+ax+","+ay+" 玩家"+me.getX()+","+me.getY()+
+                    " p"+me.getPlane()+"->"+target.p+" try"+interactTries);
             }
             return;
         }

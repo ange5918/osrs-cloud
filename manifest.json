@@ -17,10 +17,10 @@
     {
       "name": "navbot",
       "desc": "官方astar3精确复刻(内嵌steps3图+h=0):鸡区->L2->GE2",
-      "version": "2.9",
+      "version": "2.10",
       "type": "dex",
       "path": "dex/navbot.dex",
-      "sha256": "bf87816586fe2be52fab543175db9e7cefb963af08a7039cdb1be63780e1c20e",
+      "sha256": "1289bbe621fa2831f91900c4c83f82bd43b2fdb5d4e7970be53c803af3869028",
       "class": "navbot.NavBot",
       "entry": "navbot.NavBot"
     },
