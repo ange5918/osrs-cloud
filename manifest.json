@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 12,
+  "version": 13,
   "updated": "2026-11-24",
   "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
@@ -33,6 +33,16 @@
       "sha256": "4058c163b7a0ae938a6235f21a079ca2020b1f40203cd6fac28b7365893a5286",
       "class": "fish.Fish",
       "entry": "fish.Fish"
+    },
+    {
+      "name": "e2e",
+      "desc": "全程Ghost API: L2取5coins->商店买1hammer",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/e2e.dex",
+      "sha256": "9082c2a52e5d81f2763e34adb4c1c90d4d2c31b16557c100fb5345fc80774e03",
+      "class": "e2e.E2E",
+      "entry": "e2e.E2E"
     }
   ],
   "offsets": {
