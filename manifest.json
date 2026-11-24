@@ -53,6 +53,16 @@
       "sha256": "67d5a77b664385c77deeb13bad9184be1cbefc548e121492e962c72b83a62b95",
       "class": "objprobe.ObjProbe",
       "entry": "objprobe.ObjProbe"
+    },
+    {
+      "name": "objprobe2",
+      "desc": "受控探针v2: 文件输出+clicknear+最近id",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/objprobe2.dex",
+      "sha256": "365030444c0eecb7fe1cdcd37826aaf11528278e0ac08e2f47a9b5190fab6b3f",
+      "class": "objprobe2.ObjProbe2",
+      "entry": "objprobe2.ObjProbe2"
     }
   ],
   "offsets": {
