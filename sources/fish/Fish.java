@@ -72,6 +72,10 @@ public final class Fish implements Plugin {
     private String lastCmd = "";
     private int poll = 0;
     private int restLeft = 0;                // 对应 Ghost Wait.ticks(4,5) 的攻击后休息
+    // 官方寻路图空洞区(如 GE)规划失败时的兜底: Ghost Walker.walkTo 低频重发
+    private long lastDirectWalk = -1;
+    private Coord lastNavPos = null;
+    private int navFailTicks = 0;
 
     @Override
     public void configure(PluginContext context) {
@@ -145,6 +149,18 @@ public final class Fish implements Plugin {
         if (!mine.contains(here)) {
             WorldPoint meWp = client.getLocalPlayerLocation();
             if (nav != null && meWp != null) nav.tick(meWp);
+            // 图空洞区(GE等)规划失败 -> Ghost Walker 兜底直发终点, 低频重发避免 flood
+            if (nav == null || nav.lastPlanFailed) {
+                boolean moved = lastNavPos == null || lastNavPos.x() != here.x() || lastNavPos.y() != here.y();
+                navFailTicks = moved ? 0 : navFailTicks + 1;
+                lastNavPos = here;
+                long t = tick.getTick();
+                if (navFailTicks >= 5 && (lastDirectWalk < 0 || t - lastDirectWalk >= 30)) {
+                    lastDirectWalk = t;
+                    Walker.walkTo(MINE_X, MINE_Y);
+                    log("官方寻路无覆盖 -> Ghost Walker 兜底走向鸡区 (" + MINE_X + "," + MINE_Y + ") 当前 " + here);
+                }
+            }
             return;
         }
 

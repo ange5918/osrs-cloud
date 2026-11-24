@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 9,
+  "version": 10,
   "updated": "2026-11-24",
   "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
@@ -30,7 +30,7 @@
       "version": "2.0",
       "type": "dex",
       "path": "dex/fish.dex",
-      "sha256": "477c039973e771991219b597d6993919fe904a14ba1cf87b27a1698c523432cc",
+      "sha256": "fa1e248d570dcdae8f6771ac5f184bc4b7a8724ec16698b78fac539706fcfa9b",
       "class": "fish.Fish",
       "entry": "fish.Fish"
     }
