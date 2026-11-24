@@ -48,9 +48,12 @@ import java.util.function.Predicate;
 public final class Fish implements Plugin {
     private PluginContext ctx;
     private Client client;
+    private OfficialNav nav;                 // 官方 astar3 寻路（人不在鸡区时走过去）
 
     private static final String CMD_FILE = "/data/local/tmp/fish.txt";
     private static final int EVERY = 30;   // 20ms/tick -> 约 600ms 执行一次
+    // 杀鸡区：placeFromBottomLeft 的同样区域，官方寻路目标取中心点
+    private static final int MINE_X = 3178, MINE_Y = 3296, MINE_PLANE = 0;
 
     private long loops = 0;
     private boolean active = true;
@@ -71,6 +74,9 @@ public final class Fish implements Plugin {
     @Override
     public void startUp() {
         ctx.log("[Fish] 启动(AstraStudio版)。启停: echo stop > " + CMD_FILE + " 停 / echo start 启 / echo stat 状态");
+        nav = new OfficialNav(client, ctx);
+        nav.init();
+        nav.setGoal(MINE_X, MINE_Y, MINE_PLANE, "鸡区");
     }
 
     @Override
@@ -242,20 +248,32 @@ public final class Fish implements Plugin {
     public void onTick(GameTick tick) {
         pollCommand();
         if (!active) return;
-        if (tick.getTick() % EVERY != 0) return;
         if (client == null || !client.isLoggedIn()) return;
         loops++;
 
-        // 休息倒计时：攻击后跳过若干 tick
+        Player me = localPlayer();
+        Coord here = coordOf(me);
+        if (here == null) return;
+        WorldPoint meWp = me.getWorldLocation();
+
+        final Place mine = placeFromBottomLeft("杀鸡", new Coord(3173, 3289, 0), 12, 15);
+
+        // ===== 不在鸡区：交给官方 astar3 寻路走过去（逐 tick 驱动，含楼梯/跨层交互）=====
+        if (!mine.contains(here)) {
+            if (nav != null) nav.tick(meWp);
+            return;
+        }
+
+        // ===== 已在鸡区：官方寻路任务结束，执行杀鸡（沿用 Ghost 原流程与调试点）=====
+        // 攻击按 EVERY 节流，避免每 tick 重复点击刷屏
+        if (tick.getTick() % EVERY != 0) return;
+
+        // 休息倒计时：攻击后跳过若干轮
         if (restLeft > 0) {
             restLeft--;
             if (restLeft == 0) resting = false;
             return;
         }
-
-        Player me = localPlayer();
-        Coord here = coordOf(me);
-        if (here == null) return;
 
         // ★ 原版：getAttackStyle() 返回 Integer 可空，必须先判 null 再比较，绝不空拆箱。
         Integer style = getAttackStyle();
@@ -283,29 +301,23 @@ public final class Fish implements Plugin {
         if (isTargetingNpc() || isMoving(here) || !isIdle()) {
             return;
         }
-        log("bbbb");
-        final Place mine = placeFromBottomLeft("杀鸡", new Coord(3173, 3289, 0), 12, 15);
-        if (mine.contains(here)) {
-            log("ccc");
-            // 原版这里用 var target；Java 8 不支持 var，改为显式类型 NPC。
-            // 原版判定 x.interacting().isEmpty()（自研 NPC 恒 empty）；改用 getHealth()>0 保证存活。
-            NPC target = getNearest(new Predicate<NPC>() {
-                @Override public boolean test(NPC n) {
-                    return n != null
-                            && n.getName() != null
-                            && n.getName().contains("Chicken")
-                            && n.getHealth() > 0
-                            && mine.contains(coordOf(n));
-                }
-            });
-            if (target != null) {
-                log("dddd ：" + target.getName());
-                client.interactNpc(target, "Attack");
-                resting = true;
-                restLeft = 4;
+        log("ccc —— 已到鸡区，开始找鸡");
+        // 原版这里用 var target；Java 8 不支持 var，改为显式类型 NPC。
+        // 原版判定 x.interacting().isEmpty()（自研 NPC 恒 empty）；改用 getHealth()>0 保证存活。
+        NPC target = getNearest(new Predicate<NPC>() {
+            @Override public boolean test(NPC n) {
+                return n != null
+                        && n.getName() != null
+                        && n.getName().contains("Chicken")
+                        && n.getHealth() > 0
+                        && mine.contains(coordOf(n));
             }
-        } else {
-            walkTo(mine.centre());
+        });
+        if (target != null) {
+            log("dddd ：" + target.getName());
+            client.interactNpc(target, "Attack");
+            resting = true;
+            restLeft = 4;
         }
     }
 }
