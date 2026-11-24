@@ -5567,8 +5567,8 @@ public final class NavBot implements Plugin {
             int[] live=findLiveStair(prev.x,prev.y,target.x,target.y);
             if(live!=null){oid=live[0];sx=live[1];sy=live[2];}
             int sd=Math.max(Math.abs(sx-me.getX()),Math.abs(sy-me.getY()));
-            // 服务器要求站楼梯相邻格: 一律先走到现场楼梯旁(用现场坐标, 不再用旧target锚点)
-            if(sd>1){
+            // 服务器要求站楼梯附近: 真包验证距2格也能上楼; 放宽阈值避免跨层walkTo无效卡死
+            if(sd>2){
                 if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(sx,sy);lastWalkTick=t;}
                 ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
                 return;
