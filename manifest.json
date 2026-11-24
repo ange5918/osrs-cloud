@@ -30,7 +30,7 @@
       "version": "1.0",
       "type": "dex",
       "path": "dex/fish.dex",
-      "sha256": "9be63f0ce9a585a2cad42aba288067f655f4d50b5fb86ea2cd71066aa0d35f7e",
+      "sha256": "22210339740e2eccacde69cb2bf6d28c887c88ee6cf6b896a5976687f54cd7aa",
       "class": "fish.Fish",
       "entry": "fish.Fish"
     }
