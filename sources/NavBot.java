@@ -4234,6 +4234,8 @@ public final class NavBot implements Plugin {
                 //   触发 onTick "无路->清空屏蔽->又选回原格" 的震荡(实测 GE 区 353->374->366 步抖动)。
                 //   软惩罚保证 A* 恒有路, 优先绕行; 真无替代时仍走该格(不再原地打转)。
                 if(blockedTiles.contains(key(nx,ny,np))) cost += 50;
+                // ★现场已打开的门格: 离线图仍标cost2, 放行成cost1 -> 走短路(如31步而非绕路58步)
+                if(openedTiles.containsKey(nx+","+ny+","+np) && cost>1) cost=1;
                 double ng=c.g+cost;
                 long nk=key(nx,ny,np);
                 PtState old=best.get(nk);
