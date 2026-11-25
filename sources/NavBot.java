@@ -926,6 +926,12 @@ public final class NavBot implements Plugin {
                     dumpN++;
                 }
                 if(!hit)continue;
+                // ★动作硬校验(PC Ghost同款判据): 必须是真正能"通过"的动作才算障碍。
+                //   实测 3108'entrance' acts=[forfeit] 被当门点, p2 原地打转 —— forfeit/exit
+                //   根本不是通行动作。缺此校验时 name 命中 OBJ_NAMES 即放行, 误点非门物件。
+                boolean passable=false;
+                for(String a:acts){ if(isPassAct(a)){passable=true;break;} }
+                if(!passable)continue;
                 // ★非挡路物过滤: 容器/装饰物虽有 open 动作但不是寻路障碍, 交给它们会把玩家卡在
                 //   箱子格反复开(实测 closed chest n=5 来回震荡)。opener 只管门/闸/栅栏类。
                 if(nm.contains("chest")||nm.contains("drawer")||nm.contains("cupboard")
