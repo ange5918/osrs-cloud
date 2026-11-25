@@ -946,22 +946,7 @@ public final class NavBot implements Plugin {
         if(ahead.size()<2)return false;
         // 2) 沿ahead找第一条 current->next 的 cost=2 边, next=障碍格 (官方权威判据)
         int tx=-1,ty=-1; int[] nb=new int[8*4];
-        // ★端上 stuck 证据: walkgraph 有时把关闭的门标成 cost=1(可走), 找不到 cost=2 边导致 opener 不触发,
-        //   玩家卡在同格 stuckTicks 持续上涨。卡住>=阈值时, 把路径前方第一格(ahead[1])当障碍格, 交给
-        //   现场object验证+def真值门候选处理。这是 PC Ghost on_obstacle 的端上等价补充。
-        boolean stuckForced=false;
-        if(stuckTicks>=12){
-            // 取路径中第一个非脚格(玩家正试图走入却走不动的格子)=真障碍格。
-            // ahead[0]常是脚格本身, 从ahead[1]起找第一个不同于玩家坐标的点。
-            for(int ai=0;ai<ahead.size();ai++){
-                int qx=ahead.get(ai)[0],qy=ahead.get(ai)[1];
-                if(qx==mx&&qy==my)continue;
-                tx=qx;ty=qy;stuckForced=true;
-                ctx.log("[opener] ★stuck="+stuckTicks+" 强制障碍格("+tx+","+ty+") p"+mp+" ai="+ai);
-                break;
-            }
-        }
-        if(!stuckForced) costEdge:
+        costEdge:
         for(int i=0;i+1<ahead.size();i++){
             int ax=ahead.get(i)[0],ay=ahead.get(i)[1],bx=ahead.get(i+1)[0],by=ahead.get(i+1)[1];
             int n=steps3(ax,ay,mp,nb);
@@ -969,12 +954,23 @@ public final class NavBot implements Plugin {
                 if(nb[k*4]==bx&&nb[k*4+1]==by&&nb[k*4+2]==mp&&nb[k*4+3]==2){tx=bx;ty=by;break costEdge;}
             }
         }
-        // 兜底: cost2没命中再用object距离(官方OBS_NEAR)
+        // 兜底1: cost2没命中再用object距离(官方OBS_NEAR) —— native真坐标修复后可命中面前门
         if(tx<0){
             outer:
             for(int[] q:ahead){
                 if(q[0]==mx&&q[1]==my)continue;
                 for(ObsObj o:obs){ if(Math.abs(q[0]-o.x)+Math.abs(q[1]-o.y)<=OBS_NEAR){tx=q[0];ty=q[1];break outer;} }
+            }
+        }
+        // 兜底2: ★stuck 证据 —— cost2和object距离都没命中, 但玩家卡住(stuckTicks>=12),
+        //   把路径中第一个非脚格当障碍格。PC Ghost on_obstacle 的端上补充。
+        if(tx<0 && stuckTicks>=12){
+            for(int ai=0;ai<ahead.size();ai++){
+                int qx=ahead.get(ai)[0],qy=ahead.get(ai)[1];
+                if(qx==mx&&qy==my)continue;
+                tx=qx;ty=qy;
+                ctx.log("[opener] ★stuck="+stuckTicks+" 强制障碍格("+tx+","+ty+") p"+mp+" ai="+ai);
+                break;
             }
         }
         if(tx<0)return false;
@@ -1080,9 +1076,10 @@ public final class NavBot implements Plugin {
         //   ★坐标对齐 PC Ghost: 用 object 自身真坐标 (best.x,best.y) —— native 已修复真坐标+真plane,
         //   这是官方 TileObject.getWorldLocation() 等价真值。障碍格(tx,ty)仅作object坐标离谱时的兜底。
         //   只发一次, 不叠加另一个发包(否则同tick两个op88 toggle两次=没开), 这是PC Ghost防toggle核心。
-        int ix=best.x, iy=best.y;
-        // 若object离障碍格>3(坐标异常)才退回障碍格
-        if(Math.abs(ix-tx)+Math.abs(iy-ty)>3){ ix=tx; iy=ty; }
+        // ★端上真值验证: 门object经native换算的y有~2格残差(报3219,3470; 真值/历史成功包=3219,3472)。
+        //   路径cost2算出的障碍格(tx,ty)才是权威格, 历史成功 invoke_object_at(11773,3219,3472,0) 可证。
+        //   故发包坐标一律用障碍格(tx,ty), 不用object自身坐标(PC Ghost 在端上的坐标适配)。
+        int ix=tx, iy=ty;
         int slot=0; boolean found=false;
         for(String want:INVOKE_PRIORITY){
             int idx=best.acts.indexOf(want);
