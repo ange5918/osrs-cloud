@@ -925,6 +925,11 @@ public final class NavBot implements Plugin {
                     dumpN++;
                 }
                 if(!hit)continue;
+                // ★非挡路物过滤: 容器/装饰物虽有 open 动作但不是寻路障碍, 交给它们会把玩家卡在
+                //   箱子格反复开(实测 closed chest n=5 来回震荡)。opener 只管门/闸/栅栏类。
+                if(nm.contains("chest")||nm.contains("drawer")||nm.contains("cupboard")
+                   ||nm.contains("cabinet")||nm.contains("bank")||nm.contains("manhole")
+                   ||nm.contains("bush")||nm.contains("search"))continue;
                 // ★楼梯/梯子不进opener候选: 跨层交互由专门的跨层分支处理, opener只管门/闸等挡路障碍。
                 //   否则 opener 会把 staircase(climb-up) 当障碍狂点(实测 n=20) 且卡住玩家。
                 boolean isStair=isStairName(nm);
@@ -1027,6 +1032,10 @@ public final class NavBot implements Plugin {
             for(int oi=0;oi<obs.size();oi++){
                 ObsObj o=obs.get(oi);
                 if(o.stair)continue;
+                // ★只认 door/gate 名字的挡路物: 排除 chest/drawers/manhole 等容器(open动作但非障碍),
+                //   否则 stuck/距离兜底会把箱子当门反复开, 玩家来回震荡。
+                boolean isDoorName=o.name.contains("door")||o.name.contains("gate");
+                if(!isDoorName)continue;
                 boolean isDoor=false;
                 for(String a:o.acts){ if(a.equals("open")||a.equals("close")){isDoor=true;break;} }
                 if(!isDoor)continue;
