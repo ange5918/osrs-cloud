@@ -4116,7 +4116,7 @@ public final class NavBot implements Plugin {
     // ★PC同款防死循环: 现场确认走不通的"假障碍格"加入屏蔽集, astar 绕路(而非无限撞同一格)。
     //   实测 3203,3476 p2 对着 3203,3475 假门空发 139 tick 卡死, 根因就是假门证伪不屏蔽+重规划又选同一格。
     private final java.util.Set<Long> blockedTiles=new java.util.HashSet<>();
-    private static final class ObsObj { int id,x,y,pl; String name; java.util.List<String> acts; boolean stair; }
+    private static final class ObsObj { int id,x,y,pl; String name; java.util.List<String> acts; boolean stair; boolean truthTile; }
 
     public void configure(PluginContext c){
         ctx=c;client=c.getClient();
@@ -4409,6 +4409,45 @@ public final class NavBot implements Plugin {
                 oo.name=nm; oo.acts=acts; oo.stair=false;
                 out.add(oo);
             }
+            // ★★getTileObjects() 真值补门(2026-11-25 修复): objects() 把门错报到 p1/西边一格,
+            //   但 getTileObjects() 现在返回真坐标+真plane。玩家脚下(同层)那扇 11773@(3203,3476,p2)
+            //   才是能点开的真门(实测 clickxy 同层坐标 -> 门从11773变11772=开了)。
+            //   把这些同层真门追加为候选, truthTile=true, 排序时最高优先, 且不受"脚下排除"过滤。
+            try{
+                java.util.List<com.astrastudio.api.model.TileObject> tos=client.getTileObjects();
+                int tileDoorN=0;
+                if(tos!=null) for(com.astrastudio.api.model.TileObject to:tos){
+                    if(to==null)continue;
+                    int oid=to.getId();
+                    if(oid<=0)continue;
+                    com.astrastudio.api.model.WorldPoint wp=to.getWorldLocation();
+                    if(wp==null)continue;
+                    String nm=to.getName()==null?"":to.getName().toLowerCase();
+                    // 排除容器/装饰, 只认门/闸
+                    boolean doorName=nm.contains("door")||nm.contains("gate");
+                    // id 兜底: 名字空时用 def 表判断是不是门
+                    String[] def=com.astrastudio.runtime.internal.ObjectDefs.get(oid);
+                    String defNm=(def!=null&&def[0]!=null)?def[0].toLowerCase():"";
+                    if(!doorName&&!defNm.contains("door")&&!defNm.contains("gate"))continue;
+                    int tp=wp.getPlane(),tx=wp.getX(),ty=wp.getY();
+                    // ★只取与玩家同层的真门(跨层包不可避免点空)
+                    int myPlane;
+                    try{ myPlane=client.getPlane(); }catch(Throwable e){ myPlane=tp; }
+                    if(tp!=myPlane)continue;
+                    java.util.List<String> ta=new java.util.ArrayList<>();
+                    String da=doorActs(oid);
+                    if(!da.isEmpty()) for(String part:da.split(",")) if(!part.trim().isEmpty()) ta.add(part.trim().toLowerCase());
+                    else if(def!=null&&def[1]!=null) for(String a:def[1].split(",")) if(!a.trim().isEmpty()) ta.add(a.trim().toLowerCase());
+                    boolean passable=false;
+                    for(String a:ta){if(isPassAct(a)){passable=true;break;}}
+                    if(!passable)continue;
+                    ObsObj oo=new ObsObj(); oo.id=oid; oo.x=tx; oo.y=ty; oo.pl=tp;
+                    oo.name=nm.isEmpty()?defNm:nm; oo.acts=ta; oo.stair=false; oo.truthTile=true;
+                    out.add(oo);
+                    if(tileDoorN<6) ctx.log("[opener诊断] ★TILE真门 id="+oid+" name='"+oo.name+"' @("+tx+","+ty+",p"+tp+") acts="+ta);
+                    tileDoorN++;
+                }
+            }catch(Throwable e){ctx.log("[opener诊断] TILE门 EX "+e);}
         }catch(Throwable e){ctx.log("[opener诊断] EX "+e);}
         return out;
     }
@@ -4553,6 +4592,14 @@ public final class NavBot implements Plugin {
         java.util.List<int[]> ranked=new java.util.ArrayList<>();  // {obsIdx, dPath, dTarget, score}
         for(int oi=0;oi<obs.size();oi++){
             ObsObj o=obs.get(oi);
+            // ★★getTileObjects 同层真门(truthTile): 最高优先级, 免一切过滤。
+            //   实测只有同层门能点开(objects()报的p1门点空)。真门坐标就是发包坐标。
+            if(o.truthTile){
+                int dT=Math.abs(o.x-tx)+Math.abs(o.y-ty);
+                int dMe=Math.abs(o.x-mx)+Math.abs(o.y-my);
+                ranked.add(new int[]{oi,0,dT, -100000 + dT*100 + dMe}); // 负分=永远排最前
+                continue;
+            }
             // ★按 PC Ghost: opener 不按"门自己 plane==玩家 plane"硬过滤。
             //   PC 的 objects.near(mp,...)  admissible 靠"到障碍格/路径的距离", 门报 p1 但玩家在 p2
             //   照样 invoke(实证 before p2 点 Door@3203,3476)。端上旧 `o.pl!=mp` 把真门
@@ -4653,7 +4700,8 @@ public final class NavBot implements Plugin {
         if(t-lastOpenerDiag>=40){
             ObsObj db=obs.get(ranked.get(0)[0]);
             ctx.log("[opener] 选best mp="+mp+" tx="+tx+","+ty+" ranked="+ranked.size()
-                    +" bestId="+db.id+" bestPl="+db.pl+" bestXY="+db.x+","+db.y);
+                    +" bestId="+db.id+" bestPl="+db.pl+" bestXY="+db.x+","+db.y
+                    +(db.truthTile?" ★TILE真门":""));
         }
         ObsObj best=obs.get(ranked.get(0)[0]);
         // ★官方 ObjectDef.actions 真值: Close 且无 Open = 门已开, 不是障碍, 直接走过(绝不发 op88)
@@ -4794,6 +4842,9 @@ public final class NavBot implements Plugin {
      *  n2用路径障碍格(tx,ty)。返回 {ix,iy,mode}。门报p1玩家p2时轮换第二格避免按玩家层点空。 */
     private int[] doorInvokeCoord(ObsObj b,int tx,int ty,int mx,int my,int n){
         int ix=b.x,iy=b.y,mode=1;
+        // ★truthTile 同层真门: getTileObjects真值, 门自身坐标就是能点开的坐标(实测),
+        //   不做坐标轮换, 坚持用门真坐标(轮换到障碍格/玩家层反而点空)。
+        if(b.truthTile) return new int[]{b.x,b.y,4};
         if(n==2){ ix=tx; iy=ty; mode=2; }
         // 坐标为0(异常)时兜底到障碍格
         if(ix==0&&iy==0){ix=tx;iy=ty;mode=3;}
