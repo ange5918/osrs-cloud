@@ -4374,7 +4374,11 @@ public final class NavBot implements Plugin {
         // ★PC官方 _within_scene/idx: 不重规划时把 pathIdx 同步到"路径上距玩家最近的点",
         //   否则大步走跳过路径点后 pathIdx 落后, bigStepGoal 扫描起点错位导致停走/空点。
         //   ghost_navigator_live.py: idx = min(range(len(rt)), key=|rt[i]-player|)。
-        if(!path.isEmpty()&&me.getPlane()==goalP){
+        // ★★根因修复(用户"上下都点/来回横跳"): 旧条件 me.getPlane()==goalP 导致跨层期间
+        //   (玩家p0/目标p2)整个同步被跳过 -> pathIdx永远卡0 -> target恒为规划起点格 ->
+        //   玩家在起点附近来回走。循环内已有 q.p!=me.getPlane() 只同步同层点, 外层条件多余。
+        //   去掉后: 跨层期间也能沿本层路径点推进, 走到跨层边才交楼梯分支。
+        if(!path.isEmpty()){
             int bestI=pathIdx,bestD=Integer.MAX_VALUE;
             for(int pi=0;pi<path.size();pi++){
                 Pt q=path.get(pi); if(q.p!=me.getPlane())continue;
