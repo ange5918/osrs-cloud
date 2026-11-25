@@ -1023,6 +1023,7 @@ public final class NavBot implements Plugin {
             //   端上坐标假, 用严格重合换取不误点。
             int dTarget=Math.abs(o.x-tx)+Math.abs(o.y-ty);
             if(dTarget>0)continue;
+            int near=OBS_NEAR;
             int dPath=OBS_NEAR+1;
             for(int[] q:ahead){
                 int dd=Math.abs(o.x-q[0])+Math.abs(o.y-q[1]);
