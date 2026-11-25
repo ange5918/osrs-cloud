@@ -946,7 +946,16 @@ public final class NavBot implements Plugin {
         if(ahead.size()<2)return false;
         // 2) 沿ahead找第一条 current->next 的 cost=2 边, next=障碍格 (官方权威判据)
         int tx=-1,ty=-1; int[] nb=new int[8*4];
-        costEdge:
+        // ★端上 stuck 证据: walkgraph 有时把关闭的门标成 cost=1(可走), 找不到 cost=2 边导致 opener 不触发,
+        //   玩家卡在同格 stuckTicks 持续上涨。卡住>=阈值时, 把路径前方第一格(ahead[1])当障碍格, 交给
+        //   现场object验证+def真值门候选处理。这是 PC Ghost on_obstacle 的端上等价补充。
+        boolean stuckForced=false;
+        if(stuckTicks>=12 && ahead.size()>=1){
+            // 取路径当前目标格(玩家正试图走入却走不动的格子)=真障碍格
+            tx=ahead.get(0)[0]; ty=ahead.get(0)[1]; stuckForced=true;
+            ctx.log("[opener] ★stuck="+stuckTicks+" 强制障碍格("+tx+","+ty+") p"+mp);
+        }
+        if(!stuckForced) costEdge:
         for(int i=0;i+1<ahead.size();i++){
             int ax=ahead.get(i)[0],ay=ahead.get(i)[1],bx=ahead.get(i+1)[0],by=ahead.get(i+1)[1];
             int n=steps3(ax,ay,mp,nb);
