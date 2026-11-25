@@ -4836,9 +4836,9 @@ public final class NavBot implements Plugin {
             // ★门已开: 标记该格已放行并交还正常走路(逐格target推进), 不再每tick walkTo(门另一侧)卡死。
             openedTiles.put(tx+","+ty+","+mp,t);
             ctx.log("[opener] ★门已开 id="+best.id+" acts="+best.acts+" -> 标记放行("+tx+","+ty+") 交还正常走路");
-            crossGateTick.remove(best.id+"@"+tx+","+ty);
+            crossGateTick.remove("tile@"+tx+","+ty+",p"+mp);
             fakeDoorN.remove(tx+","+ty+","+mp);
-            doorOscN.remove(best.id+"@"+tx+","+ty);
+            doorOscN.remove("tile@"+tx+","+ty+",p"+mp);
             // 也放行门自身坐标格(实测门object坐标可能与障碍格错开1格, 如11772@3219,3472 vs 障碍格3218,3472)
             openedTiles.put(best.x+","+best.y+","+mp,t);
             return false;
@@ -4861,8 +4861,10 @@ public final class NavBot implements Plugin {
             catch(Throwable e){ ctx.log("[opener] 位移invoke异常 "+e+" -> sendObj1"); sendObj1(best.id,best.x,best.y); }
             return true;
         }
-        // ★key用障碍格真坐标(tx,ty), 不用设备错报的best.x,best.y(否则防toggle失效)
-        String key=best.id+"@"+tx+","+ty;
+        // ★key用障碍格真坐标(tx,ty,mp), 不用门id! 实测同一障碍格3213,3222在 134/12349/12350
+        //   多扇门id间抖动 -> 按id做key时每个id的n都到不了9, A/B/D全无效也不屏蔽, 玩家三角震荡卡死。
+        //   按障碍格做key, 所有门id抖动累计到同一计数, n>=9正常触发屏蔽绕路。
+        String key="tile@"+tx+","+ty+",p"+mp;
         long nowMs=System.currentTimeMillis();
         // 5) 门6s内开过 -> 不重复toggle, 直接走过。
         //   ★但门若仍[open](关着)说明上次invoke没生效(acts没翻转)——此时不能套6s防toggle窗,
