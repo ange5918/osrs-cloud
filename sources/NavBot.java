@@ -4584,8 +4584,18 @@ public final class NavBot implements Plugin {
         }
         // 4) 假门证伪: 有障碍格但无object候选 -> 计3次直接走过
         if(ranked.isEmpty()){
+            // ★一次性诊断: 打印 scene base / 本地玩家 base / 目标格单格原始返回
             String fk=tx+","+ty+","+mp;
             int n=fakeDoorN.containsKey(fk)?fakeDoorN.get(fk)+1:1; fakeDoorN.put(fk,n);
+            if(n==1||n==5){
+                int[] _sb=com.astrastudio.runtime.internal.NativeBridge.nativeSceneBase();
+                int[] _lb=com.astrastudio.runtime.internal.NativeBridge.nativeReadLocalBase();
+                int[] _tr=com.astrastudio.runtime.internal.NativeBridge.nativeTileObjects(tx,ty,mp);
+                ctx.log("[openerDBG] target="+tx+","+ty+",p"+mp+" me="+mx+","+my
+                        +" sceneBase="+java.util.Arrays.toString(_sb)
+                        +" localBase="+java.util.Arrays.toString(_lb)
+                        +" tileRaw="+java.util.Arrays.toString(_tr));
+            }
             if(n>=3){
                 // ★假门证伪: cost2 是 walkgraph 误标, 现场无真门 -> 直接朝障碍格本身走,
                 //   靠官方引擎走进去(若是假门则可通行)。绝不 walkTo(foot): foot 在障碍格
