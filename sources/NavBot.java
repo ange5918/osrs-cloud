@@ -4228,8 +4228,10 @@ public final class NavBot implements Plugin {
                 if(i<n){nx=nb[i*4];ny=nb[i*4+1];np=nb[i*4+2];cost=nb[i*4+3];}
                 else{Edge e=cross.get(i-n);nx=e.dx;ny=e.dy;np=e.dp;cost=1;
                      eoid=e.oid; eex=e.sx; eey=e.sy;}
-                // ★已证伪的假障碍格: 本段内不再选它, 强制 A* 绕路
-                if(blockedTiles.contains(key(nx,ny,np))) continue;
+                // ★已证伪的假障碍格: 软惩罚绕路(不硬断)。硬断会在唯一通路被堵死时
+                //   触发 onTick "无路->清空屏蔽->又选回原格" 的震荡(实测 GE 区 353->374->366 步抖动)。
+                //   软惩罚保证 A* 恒有路, 优先绕行; 真无替代时仍走该格(不再原地打转)。
+                if(blockedTiles.contains(key(nx,ny,np))) cost += 50;
                 double ng=c.g+cost;
                 long nk=key(nx,ny,np);
                 PtState old=best.get(nk);
@@ -4263,7 +4265,8 @@ public final class NavBot implements Plugin {
         boolean needReplan=path.isEmpty()||pathIdx>=path.size()||stuckTicks>60;
         if(needReplan){
             List<Pt> p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
-            // 屏蔽集把唯一通路也堵死时: 清空后重算一次, 避免整段导航停滞
+            // ★屏蔽已改为 A* 软惩罚(cost+50), 恒有路; 不再清空屏蔽重算(那是震荡根因)。
+            //   仅当起点本身被完全封死(理论不可能)才兜底清空一次。
             if(p.isEmpty()&&!blockedTiles.isEmpty()){
                 blockedTiles.clear();
                 p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
