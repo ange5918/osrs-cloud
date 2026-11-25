@@ -4576,6 +4576,10 @@ public final class NavBot implements Plugin {
             //   严格 dTarget==0 会把 door@3202,3475(障碍格3203,3475) 排除。放宽到<=1,
             //   同时用 score 的 onTile 项让"正好在障碍格"的门优先, 避免邻格假门被误选。
             if(dTarget>OBS_NEAR)continue;
+            // ★排除玩家脚下错报门: objects() 会把门错报到玩家当前格(实测 bestXY=3203,3476
+            //   而玩家正站3203,3476), 玩家站着的格不可能有挡路门。排除它, 让真门
+            //   door@3202,3475 入选。
+            if(o.x==mx&&o.y==my)continue;
             int dPath=OBS_NEAR+1;
             for(int[] q:ahead){
                 int dd=Math.abs(o.x-q[0])+Math.abs(o.y-q[1]);
@@ -4686,10 +4690,14 @@ public final class NavBot implements Plugin {
         //   ★坐标对齐 PC Ghost: 用 object 自身真坐标 (best.x,best.y) —— native 已修复真坐标+真plane,
         //   这是官方 TileObject.getWorldLocation() 等价真值。障碍格(tx,ty)仅作object坐标离谱时的兜底。
         //   只发一次, 不叠加另一个发包(否则同tick两个op88 toggle两次=没开), 这是PC Ghost防toggle核心。
-        // ★端上真值验证: 门object经native换算的y有~2格残差(报3219,3470; 真值/历史成功包=3219,3472)。
-        //   路径cost2算出的障碍格(tx,ty)才是权威格, 历史成功 invoke_object_at(11773,3219,3472,0) 可证。
-        //   故发包坐标一律用障碍格(tx,ty), 不用object自身坐标(PC Ghost 在端上的坐标适配)。
-        int ix=tx, iy=ty;
+        // ★★按用户要求 1:1 PC: 用真正障碍物的坐标发包, 不用路径算出的障碍格坐标。
+        //   PC act_invoke(c["x"],c["y"]) 用的就是现场 object 自身真坐标。端上旧逻辑因历史
+        //   y残差改用障碍格(tx,ty), 但真值链修复后 objects() 坐标已是真值:
+        //   真门 door@(3202,3475), 障碍格(3203,3475) —— 用障碍格发包差一格, 点空, 门不开。
+        //   改用 best.x,best.y; 仅在物体坐标为0(异常)时回退障碍格。
+        int ix=(best.x!=0?best.x:tx), iy=(best.y!=0?best.y:ty);
+        ctx.log("[opener] ★发包坐标源 bestXY="+best.x+","+best.y+" pl="+best.pl
+                +" 障碍格="+tx+","+ty+" -> 用("+ix+","+iy+")");
         int slot=0; boolean found=false;
         for(String want:INVOKE_PRIORITY){
             int idx=best.acts.indexOf(want);
