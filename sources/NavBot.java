@@ -4377,8 +4377,11 @@ public final class NavBot implements Plugin {
             boolean liveUsed=false;
             if(ed!=null){
                 oid=ed.oid; sx=ed.sx; sy=ed.sy;           // 官方图真值(oid)优先
-                if(byOid!=null){sx=byOid[0];sy=byOid[1];liveUsed=true;} // ★oid+plane现场真坐标
-                else if(liveHit&&live[0]==ed.oid){sx=live[1];sy=live[2];liveUsed=true;}
+                if(byOid!=null){sx=byOid[0];sy=byOid[1];liveUsed=true;} // ★ed.oid在源层存在(如同层下楼16672@p1): 用真坐标
+                else if(liveHit){oid=live[0];sx=live[1];sy=live[2];liveUsed=true;}
+                //   ★ed.oid是"目标层"object, 玩家在源层找不到(byOid miss)时, 必须点源层现场楼梯!
+                //   实测 p2->p1: ed.oid=16673(是p1的), 源层p2能下楼的是 56231@3205,3208[Climb-down,Bottom-floor];
+                //   硬点16673服务器不执行 -> 卡死。回退到源层 findLiveStair 才对。
             }else if(liveHit){oid=live[0];sx=live[1];sy=live[2];liveUsed=true;}   // 无ed才全用现场
             ctx.log("[实时导航] ↑楼梯 oid链="+(ed!=null?"ed.oid="+ed.oid:"guessOid="+guessOid(prev.p,target.p))+
                 " 现场="+(liveHit?"id="+live[0]+"@"+live[1]+","+live[2]:"miss")+
