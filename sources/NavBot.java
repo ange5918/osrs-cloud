@@ -4430,10 +4430,13 @@ public final class NavBot implements Plugin {
                     String defNm=(def!=null&&def[0]!=null)?def[0].toLowerCase():"";
                     if(!doorName&&!defNm.contains("door")&&!defNm.contains("gate"))continue;
                     int tp=wp.getPlane(),tx=wp.getX(),ty=wp.getY();
-                    // ★只取与玩家同层的真门(跨层包不可避免点空)
+                    // ★真门 plane 与 native 玩家 plane 实测系统性错位1层(玩家报p1、脚下真门报p0)。
+                    //   严格 tp==myPlane 会把脚下真门全丢 -> 退回 objects() 静态错值11772 ->
+                    //   误判"门已开->直接走过" -> 顶着关门卡死。放宽到相邻层, 由 ranked 的 dMe 排序
+                    //   把真正贴身的那扇门排第一。
                     int myPlane;
                     try{ myPlane=client.getPlane(); }catch(Throwable e){ myPlane=tp; }
-                    if(tp!=myPlane)continue;
+                    if(Math.abs(tp-myPlane)>1)continue;
                     java.util.List<String> ta=new java.util.ArrayList<>();
                     String da=doorActs(oid);
                     if(!da.isEmpty()) for(String part:da.split(",")) if(!part.trim().isEmpty()) ta.add(part.trim().toLowerCase());
