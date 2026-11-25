@@ -4120,8 +4120,12 @@ public final class NavBot implements Plugin {
     private final java.util.Set<Long> blockedTiles=new java.util.HashSet<>();
 
     // ===== ★★PC Ghost 官方执行层 1:1 移植 (ghost_navigator_live.py) =====
-    // 差异1: 每步重规划(PC Navigator.step 内部 _plan_again)。用位置/plane变化作 base_source。
+    // 差异1: 重规划(PC Navigator._plan_again 真字节码 1:1)。
+    //   官方: held=_replans; 若位移 max(|dx|,|dy|) < REPLAN_PROGRESS(30) 且同层 -> 沿用旧计数不算新规划。
+    //   即"走一步就重规划"是错的(震荡根因), 必须位移≥30格或换层/换目标才重规划。
     private int lastPlanX=-1,lastPlanY=-1,lastPlanP=-1;
+    private int lastPlanGoalX=-1,lastPlanGoalY=-1,lastPlanGoalP=-1;
+    private static final int REPLAN_PROGRESS=30; // 官方 nav.REPLAN_PROGRESS 实测值
     // 差异3: 大步走参数(MAP_R 已有=16)。FAR_TOP=无障碍时取地图内最远5点随机。
     private static final int FAR_TOP=5, OBS_NEAR_PC=2;
     // 差异4: 位移型障碍(invoke自身位移) —— PC DISPLACE_ACTS, invoke后不walk-through落脚点
@@ -4301,11 +4305,15 @@ public final class NavBot implements Plugin {
         if(me.getX()==lastX&&me.getY()==lastY) stuckTicks++; else stuckTicks=0;
         lastX=me.getX();lastY=me.getY();
 
-        // ★差异1(PC官方): base_source位置/plane变化即重规划 —— Navigator.step 内部每步 _plan_again。
-        //   端上等价实现: 位置/plane 变化 或 无路径/走完 或 卡住(阈值收紧到20) -> 立即 astar 重规划。
-        //   这样每走一步都重新生成路径、重新判断障碍, 与 PC "走一步→官方判→自动重规划"闭环一致。
-        boolean posChanged=(me.getX()!=lastPlanX||me.getY()!=lastPlanY||me.getPlane()!=lastPlanP);
-        boolean needReplan=path.isEmpty()||pathIdx>=path.size()||posChanged||stuckTicks>20;
+        // ★差异1(PC官方 _plan_again 真字节码 1:1): REPLAN_PROGRESS=30 位移门槛。
+        //   官方: held=_replans; 若 max(|here.x-held[2].x|,|here.y-held[2].y|) < 30 且同层 -> 沿用,
+        //   不算新规划。即"位置一变就重规划"是错的(35/58步震荡根因之一)。
+        //   端上触发条件: 无路径/走完、换层、目标变化、位移≥30格、卡住(>20) 才重规划。
+        int dxPlan=me.getX()-lastPlanX, dyPlan=me.getY()-lastPlanY;
+        boolean progress=Math.max(Math.abs(dxPlan),Math.abs(dyPlan))>=REPLAN_PROGRESS;
+        boolean layerChanged=me.getPlane()!=lastPlanP;
+        boolean goalChanged=(goalX!=lastPlanGoalX||goalY!=lastPlanGoalY||goalP!=lastPlanGoalP);
+        boolean needReplan=path.isEmpty()||pathIdx>=path.size()||layerChanged||goalChanged||progress||stuckTicks>20;
         if(needReplan){
             List<Pt> p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
             // ★屏蔽已改为 A* 软惩罚(cost+50), 恒有路; 不再清空屏蔽重算(那是震荡根因)。
@@ -4320,9 +4328,22 @@ public final class NavBot implements Plugin {
             }
             path=p;pathIdx=0;stuckTicks=0;lastWalkTick=-1;
             lastPlanX=me.getX();lastPlanY=me.getY();lastPlanP=me.getPlane();
+            lastPlanGoalX=goalX;lastPlanGoalY=goalY;lastPlanGoalP=goalP;
             StringBuilder pb=new StringBuilder("[实时导航] 规划 "+p.size()+"步 "+me.getX()+","+me.getY()+",p"+me.getPlane()+" -> "+goalName+" 路径=");
             for(int pi=0;pi<p.size()&&pi<8;pi++){Pt pp=p.get(pi);pb.append(pp.x).append(",").append(pp.y).append("p").append(pp.p).append(" ");}
             ctx.log(pb.toString());
+        }
+        // ★PC官方 _within_scene/idx: 不重规划时把 pathIdx 同步到"路径上距玩家最近的点",
+        //   否则大步走跳过路径点后 pathIdx 落后, bigStepGoal 扫描起点错位导致停走/空点。
+        //   ghost_navigator_live.py: idx = min(range(len(rt)), key=|rt[i]-player|)。
+        if(!path.isEmpty()&&me.getPlane()==goalP){
+            int bestI=pathIdx,bestD=Integer.MAX_VALUE;
+            for(int pi=0;pi<path.size();pi++){
+                Pt q=path.get(pi); if(q.p!=me.getPlane())continue;
+                int md=Math.abs(q.x-me.getX())+Math.abs(q.y-me.getY());
+                if(md<bestD){bestD=md;bestI=pi;}
+            }
+            if(bestI>pathIdx) pathIdx=bestI;  // 只前进不回退(防门两侧来回)
         }
         if(lastLogTick<0||t-lastLogTick>=50){
             lastLogTick=t;
