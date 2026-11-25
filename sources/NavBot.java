@@ -4363,15 +4363,20 @@ public final class NavBot implements Plugin {
             Edge ed=findEdge(prev.x,prev.y,prev.p,target.x,target.y,target.p);
             int oid=(ed!=null)?ed.oid:guessOid(prev.p,target.p);
             int sx=prev.x, sy=prev.y;   // PC Ghost 默认坐标=prev格
-            // ②现场 objects() 真值覆盖 oid+坐标 (PC Ghost findLiveStair同款)。
-            //   ★早上成功实证: 玩家(3213,3472,p0), 楼梯object(3212,3473)斜对角曼哈顿2,
-            //     invoke_object_at(11807,3212,3473,0) 用object真坐标成功上楼 -> 用现场坐标而非边起点。
+            // ②现场 objects() 真值覆盖坐标, 但★必须 id 语义一致(现场楼梯常与官方边不是同一格)。
+            //   实测坑: 玩家(3206,3208,p1)下楼, 官方边 ed.oid=16672(双向Staircase, Climb-down slot2/op0),
+            //   而 findLiveStair 抓到旁边 56231(单向 Bottom-floor, Climb-down slot0/op88)@3205,3208,
+            //   点它服务器不执行 -> 卡死反复重规划。修法: ed.oid 存在时以它为准, 现场只在 id 匹配时才校正坐标。
             int[] live=findLiveStair(prev.x,prev.y,target.x,target.y);
             boolean liveHit=(live!=null);
-            if(liveHit){oid=live[0];sx=live[1];sy=live[2];}
-            else if(ed!=null){sx=ed.sx;sy=ed.sy;}
+            boolean liveUsed=false;
+            if(ed!=null){
+                oid=ed.oid; sx=ed.sx; sy=ed.sy;           // 官方图真值优先
+                if(liveHit&&live[0]==ed.oid){sx=live[1];sy=live[2];liveUsed=true;} // id一致才用现场坐标
+            }else if(liveHit){oid=live[0];sx=live[1];sy=live[2];liveUsed=true;}   // 无ed才全用现场
             ctx.log("[实时导航] ↑楼梯 oid链="+(ed!=null?"ed.oid="+ed.oid:"guessOid="+guessOid(prev.p,target.p))+
-                " 现场="+(liveHit?"id="+live[0]+"@"+live[1]+","+live[2]:"miss")+" 采用="+oid+"@"+sx+","+sy);
+                " 现场="+(liveHit?"id="+live[0]+"@"+live[1]+","+live[2]:"miss")+
+                (liveHit&&!liveUsed?"(现场id不匹配,弃)":"")+" 采用="+oid+"@"+sx+","+sy);
             // ★交互距离用曼哈顿(PC Ghost: 必须走到物体相邻格才能交互)。
             //   max距离会把斜对角(max=2)误判为"够近"而狂发包, 实际楼梯在斜对角op88不生效。
             int sd=Math.abs(sx-me.getX())+Math.abs(sy-me.getY());
@@ -4386,7 +4391,7 @@ public final class NavBot implements Plugin {
                 int opt=climbOpt(oid,up);
                 sendStair(oid,sx,sy,up);
                 ctx.log("[实时导航] ↑楼梯 obj="+oid+" opt"+opt+(opt==2?"(op72)":opt==1?"(op88)":"(op"+opt+")")+
-                    (liveHit?"(现场真值)":"(旧edge/guess)")+" @"+sx+","+sy+" 玩家"+me.getX()+","+me.getY()+
+                    (liveUsed?"(现场真值)":"(官方edge/guess)")+" @"+sx+","+sy+" 玩家"+me.getX()+","+me.getY()+
                     " p"+me.getPlane()+"->"+target.p+" try"+interactTries);
             }
             return;
