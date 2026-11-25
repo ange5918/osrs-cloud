@@ -616,7 +616,8 @@ public final class NavBot implements Plugin {
     //   边起点(3212,3472)/(3213,3472)是玩家脚格, 用作发包坐标会 ret=10 但服务器不换层。
     //   格式 "oid,x,y"; 未命中的 oid 回退到边锚点(老逻辑)。
     private static final String[] GE_STAIR_XY = {
-        "11807,3212,3473"
+        "11807,3212,3473",
+        "11801,3224,3472"
     };
     private static int[] geStairXY(int oid){
         for(String e:GE_STAIR_XY){
@@ -1191,7 +1192,12 @@ public final class NavBot implements Plugin {
                 if(d<=3 && d<bestD){bestD=d;best=id;bx=x;by=y;}
             }
         }catch(Throwable e){}
-        return best>0?new int[]{best,bx,by}:null;
+        if(best<=0)return null;
+        // ★真值表覆盖坐标: native object 坐标有y残差(11801报3224,3470, 真值3224,3472),
+        //   GE_STAIR_XY 来自实抓成功回执, 命中就用真坐标。
+        int[] truth=geStairXY(best);
+        if(truth!=null){bx=truth[0];by=truth[1];}
+        return new int[]{best,bx,by};
     }
     private int guessOid(int fromP,int toP){
         if(toP>fromP)return fromP==0?16671:(fromP==1?16672:11807);
