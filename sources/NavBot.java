@@ -1017,9 +1017,12 @@ public final class NavBot implements Plugin {
             // ★同层过滤(PC Ghost同款): 玩家在p2时, p1的门即使xy重合也不是本层障碍。
             //   实测 GE2 p2 把 p1 的 11773@3219,3472 当障碍硬点, 原地打转 n>6。
             if(o.pl!=mp)continue;
-            int near=OBS_NEAR;
+            // ★端上 objects() 坐标/plane 抖实测不可信: 放宽容差会选到邻格假门(实测
+            //   best@3218,3472 却对 3219/3220,3472 障碍格硬点, 原地打转)。改为硬门槛:
+            //   候选必须正好落在障碍格上(onTile), 否则不认。PC Ghost 现场坐标准可容差,
+            //   端上坐标假, 用严格重合换取不误点。
             int dTarget=Math.abs(o.x-tx)+Math.abs(o.y-ty);
-            if(dTarget>near)continue;
+            if(dTarget>0)continue;
             int dPath=OBS_NEAR+1;
             for(int[] q:ahead){
                 int dd=Math.abs(o.x-q[0])+Math.abs(o.y-q[1]);
@@ -1056,7 +1059,7 @@ public final class NavBot implements Plugin {
                 // ★坐标残差兜底: 只接受"当前玩家附近"的门。实测 object 世界坐标会在跨区块时
                 //   出现 ±8 抖动, 不限制距离会选到远处同 id 门并反复 toggle 错误格。
                 if(Math.abs(o.x-mx)+Math.abs(o.y-my)>3)continue;
-                if(Math.abs(o.x-tx)+Math.abs(o.y-ty)>3)continue;
+                if(Math.abs(o.x-tx)+Math.abs(o.y-ty)>0)continue;
                 // ★actions 真值判门开关(PG同款): [Close]=门已开可通行 -> 最高优先级(触发直接走过);
                 //   [Open]=门关需开 -> 次优先。避免选到远处静态缓存的11773[open]反复开门。
                 boolean isOpenState=false;
