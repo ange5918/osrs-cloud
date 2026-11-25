@@ -826,46 +826,32 @@ public final class NavBot implements Plugin {
         // ★PC Ghost opener: 同层路径前方有 cost=2 障碍边 -> 现场object验证+开门/爬, true=本tick接管
         if(target.p==me.getPlane() && tryOpenObstacle(me,t)) return;
 
-        // 跨层 -> 楼梯交互 (★按官方规则: oid=分层真值, slot=actions.index, opt=slot+1)
+        // 跨层 -> 楼梯交互 (★完全对齐 PC Ghost: oid=ed.oid→guessOid→findLiveStair现场覆盖, 坐标=现场object)
         if(target.p!=me.getPlane()){
             Pt prev=pathIdx>0?path.get(pathIdx-1):new Pt(me.getX(),me.getY(),me.getPlane());
             boolean up=target.p>me.getPlane();
-            // ★离线分层 oid 真值 (端上 getTileObjects plane 硬编码0, 现场坐标错位不可用):
-            //   p0->p1: 56230 (actions=[Climb-up,Top-floor], Climb-up=slot0 -> opt1/op88) 已真包验证
-            //   p1->p2: 16672 (actions=[Climb,Climb-up,Climb-down], Climb-up=slot1 -> opt2/op72) 已真包验证
-            //   p2->p1: 56231 (Climb-down=slot0 -> opt1/op88) ; p1->p0: 16672 (Climb-down=slot2 -> opt3)
-            int oid;
-            int ax,ay; // ★交互锚点必须按方向/层区分(真包逐个验证过)
-            if(target.oid>0 && target.ey>=3400){
-                // ★GE区(y>=3400)跨层边: 用边自带真实oid(11807等, Lumbridge硬编码在此不适用)
-                oid=target.oid; ax=target.ex; ay=target.ey;
-                // ★发包坐标必须用楼梯 object 真坐标(11807=3212,3473), 不是玩家脚格/边起点。
-                //   早上实抓成功: invoke_object_at(11807,3212,3473,0) plane0->1。
-                //   之前用边锚点(3213,3472)发 op88 一直 ret=10 但不换层, 差在坐标这一格。
-                int[] xy=geStairXY(oid);
-                if(xy!=null){ ax=xy[0]; ay=xy[1]; }
-                ctx.log("[实时导航] ★GE跨层边oid="+oid+" 发包锚点"+ax+","+ay+" 边起点"+target.ex+","+target.ey);
-            }else if(up){
-                oid = (me.getPlane()==0)?56230:(me.getPlane()==1?16672:11801);
-                ax=3204;ay=3207;                       // 上楼锚点(56230/16672 共用)
-            }else{
-                if(me.getPlane()==2){oid=56231;ax=3205;ay=3208;} // p2->p1: 56231@(3205,3208) 真包验证
-                else{oid=(me.getPlane()==1)?16672:56230;ax=3204;ay=3207;} // p1->p0
-            }
-            int sd=Math.max(Math.abs(ax-me.getX()),Math.abs(ay-me.getY()));
+            // ①PC Ghost链: 先取跨层边自带oid, 没有边就guessOid分层兜底
+            Edge ed=findEdge(prev.x,prev.y,prev.p,target.x,target.y,target.p);
+            int oid=(ed!=null)?ed.oid:guessOid(prev.p,target.p);
+            int sx=prev.x, sy=prev.y;   // PC Ghost 默认坐标=prev格
+            // ②现场 objects() 真值覆盖 oid+坐标 (v242 findLiveStair, 旧edge/guess的1667x已失效)
+            int[] live=findLiveStair(prev.x,prev.y,target.x,target.y);
+            boolean liveHit=(live!=null);
+            if(liveHit){oid=live[0];sx=live[1];sy=live[2];}
+            ctx.log("[实时导航] ↑楼梯 oid链="+(ed!=null?"ed.oid="+ed.oid:"guessOid="+guessOid(prev.p,target.p))+
+                " 现场="+(liveHit?"id="+live[0]+"@"+live[1]+","+live[2]:"miss")+" 采用="+oid+"@"+sx+","+sy);
+            int sd=Math.max(Math.abs(sx-me.getX()),Math.abs(sy-me.getY()));
             if(sd>3){
-                if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(ax,ay);lastWalkTick=t;}
-                ctx.log("[实时导航] →靠近楼梯 ("+ax+","+ay+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
+                if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(sx,sy);lastWalkTick=t;}
+                ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
                 return;
             }
             if(lastInteractTick<0||t-lastInteractTick>=40){
                 lastInteractTick=t;interactTries++;
                 int opt=climbOpt(oid,up);
-                // ★payload 坐标用楼梯锚点 (3204,3207), 与手动点击真包逐字节一致:
-                //   clickxy 56230 3204 3207 0 -> plane0→1 成功; 玩家站位坐标3格外服务器不执行。
-                sendStair(oid,ax,ay,up);
+                sendStair(oid,sx,sy,up);
                 ctx.log("[实时导航] ↑楼梯 obj="+oid+" opt"+opt+(opt==2?"(op72)":opt==1?"(op88)":"(op"+opt+")")+
-                    "(分层真值) @"+(up?"上":"下")+"楼锚点"+ax+","+ay+" 玩家"+me.getX()+","+me.getY()+
+                    (liveHit?"(现场真值)":"(旧edge/guess)")+" @"+sx+","+sy+" 玩家"+me.getX()+","+me.getY()+
                     " p"+me.getPlane()+"->"+target.p+" try"+interactTries);
             }
             return;
@@ -1119,30 +1105,33 @@ public final class NavBot implements Plugin {
         List<Edge> es=edgeIdx.get(key(sx,sy,sp)); if(es==null)return null;
         for(Edge e:es) if(e.dx==dx&&e.dy==dy&&e.dp==dp)return e; return null;
     }
-    /** ★v242: 现场从 objects() 读楼梯真实 id+坐标 (旧 EDGE_DATA 1667x 已失效)。
-     *  匹配 prev/target 附近3格内、name/actions 含 stair/climb/ladder 的 object。 */
+    /** ★PC Ghost findLiveStair 1:1: 现场 GhostRuntime.api().objects() 读楼梯真 id+坐标。
+     *  匹配 prev/target 附近3格内、name/actions 含 stair/climb/ladder/trapdoor/hatch 的 object。
+     *  返回 {id,x,y} 现场坐标; 找不到返回 null。 */
     private int[] findLiveStair(int px,int py,int tx,int ty){
         int best=-1,bestD=100,bx=0,by=0;
         try{
-            // ★不依赖 GhostRuntime(该类没打进 dex, 运行时 NoClassDefFoundError 被吞 -> 旧oid卡死)。
-            //   直接用 PluginContext 自带的官方 client.getTileObjects() 现场真值。
-            java.util.List<com.astrastudio.api.model.TileObject> objs=client.getTileObjects();
-            if(objs==null)return null;
-            for(com.astrastudio.api.model.TileObject o:objs){
-                if(o==null)continue;
-                com.astrastudio.api.model.WorldPoint wp=o.getWorldLocation();
-                if(wp==null)continue;
-                int oid=o.getId();
-                String name=o.getName()==null?"":o.getName().toLowerCase();
-                boolean stair=name.contains("stair")||name.contains("ladder")||name.contains("trapdoor")||name.contains("hatch");
-                if(!stair)continue;   // 官方 getName() 已是真实 def 名; Staircase 直接命中
-                if(oid<=0)continue;
-                int x=wp.getX(),y=wp.getY();
-                // 用玩家真实坐标找最近楼梯; 阈值放宽到8格(旧edge锚点可能差好几格)
-                com.astrastudio.api.model.WorldPoint pm=client.getLocalPlayerLocation();
-                int mx=pm==null?px:pm.getX(), my=pm==null?py:pm.getY();
-                int d=Math.min(Math.abs(x-mx)+Math.abs(y-my),Math.abs(x-px)+Math.abs(y-py));
-                if(d<=8&&d<bestD){bestD=d;best=oid;bx=x;by=y;}
+            java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
+            if(all==null)return null;
+            for(java.util.Map<String,Object> m:all){
+                int x=m.get("x") instanceof Number?((Number)m.get("x")).intValue():0;
+                int y=m.get("y") instanceof Number?((Number)m.get("y")).intValue():0;
+                int id=m.get("id") instanceof Number?((Number)m.get("id")).intValue():0;
+                String name=String.valueOf(m.getOrDefault("name","")).toLowerCase();
+                boolean stair=name.contains("stair")||name.contains("ladder")
+                        ||name.contains("trapdoor")||name.contains("hatch");
+                Object raw=m.get("actions");
+                // ★装机APK假动作bug: 每个object塞[interact,open,climb-up,climb-down]四件套,
+                //   识别到就忽略actions(否则满场object都因climb-up被当楼梯), 只信name。
+                boolean fake = raw instanceof java.util.List
+                    && ((java.util.List<?>)raw).contains("climb-up")
+                    && ((java.util.List<?>)raw).contains("climb-down")
+                    && ((java.util.List<?>)raw).contains("interact");
+                if(!stair && !fake && raw instanceof java.util.List)
+                    for(Object a:(java.util.List<?>)raw) if(a!=null&&String.valueOf(a).toLowerCase().startsWith("climb")){stair=true;break;}
+                if(!stair||id<=0) continue;
+                int d=Math.min(Math.abs(x-px)+Math.abs(y-py),Math.abs(x-tx)+Math.abs(y-ty));
+                if(d<=3 && d<bestD){bestD=d;best=id;bx=x;by=y;}
             }
         }catch(Throwable e){}
         return best>0?new int[]{best,bx,by}:null;
