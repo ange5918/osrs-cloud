@@ -4127,7 +4127,31 @@ public final class NavBot implements Plugin {
         try{ com.ghost.api.shim.GhostRuntime.install(client); }catch(Throwable e){}
     }
 
+    /** ★自净: 摘除 eventBus 上所有历史遗留的旧 NavBot 实例。
+     *  根因: PluginManager 用类名 navbot.NavBot 做 map key, 多次 load 时新实例覆盖 map,
+     *  但旧实例仍注册在 ReflectEventBus.bySubscriber 上, stopPlugin 按类名只摘 map 里最后一个,
+     *  旧实例每 tick 继续跑旧代码(路径震荡/旧文案)。这里按类名字符串(不同 DexClassLoader
+     *  加载的 Class 对象不同, 不能用 instanceof)逐个 unregister, 只保留 this。 */
+    private void evictOldNavBotInstances(){
+        try{
+            Object eb=ctx.getEventBus();
+            if(eb==null)return;
+            java.lang.reflect.Field f=eb.getClass().getDeclaredField("bySubscriber");
+            f.setAccessible(true);
+            java.util.Map<Object,Object> subs=(java.util.Map<Object,Object>)f.get(eb);
+            java.util.List<Object> victims=new java.util.ArrayList<Object>();
+            for(Object sub:subs.keySet()){
+                if(sub==null||sub==this)continue;
+                if("navbot.NavBot".equals(sub.getClass().getName()))victims.add(sub);
+            }
+            java.lang.reflect.Method unreg=eb.getClass().getMethod("unregister",Object.class);
+            for(Object v:victims)unreg.invoke(eb,v);
+            if(!victims.isEmpty())ctx.log("[实时寻路] ★自净: 已摘除 "+victims.size()+" 个旧NavBot实例");
+        }catch(Throwable e){ctx.log("[实时寻路] 自净异常 "+e);}
+    }
+
     public void startUp(){
+        evictOldNavBotInstances();
         try{
             StringBuilder sb=new StringBuilder();
             for(String s:BLOCK_DATA) sb.append(s);
