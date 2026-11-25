@@ -1014,6 +1014,9 @@ public final class NavBot implements Plugin {
         java.util.List<int[]> ranked=new java.util.ArrayList<>();  // {obsIdx, dPath, dTarget, score}
         for(int oi=0;oi<obs.size();oi++){
             ObsObj o=obs.get(oi);
+            // ★同层过滤(PC Ghost同款): 玩家在p2时, p1的门即使xy重合也不是本层障碍。
+            //   实测 GE2 p2 把 p1 的 11773@3219,3472 当障碍硬点, 原地打转 n>6。
+            if(o.pl!=mp)continue;
             int near=OBS_NEAR;
             int dTarget=Math.abs(o.x-tx)+Math.abs(o.y-ty);
             if(dTarget>near)continue;
