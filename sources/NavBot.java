@@ -4116,6 +4116,12 @@ public final class NavBot implements Plugin {
     private long lastDoorInvokeTick=-1,lastOpenerDiag=-1;
     private final java.util.Map<String,Long> crossGateTick=new java.util.HashMap<>();
     private final java.util.Map<String,int[]> crossGateFoot=new java.util.HashMap<>();
+    // ★PC官方 crossing at / MID_CROSS_POLLS / _sample_work 1:1: "过完障碍物"中途轮询。
+    //   crossGateFrom=发包时玩家坐标 (_sample_work 用它对比当前坐标判真位移);
+    //   crossPollN=本轮已轮询次数 (坐标不动才累加, 有位移重置, 达 MID_CROSS_POLLS 仍未过 -> 换招/绕行)。
+    private final java.util.Map<String,int[]> crossGateFrom=new java.util.HashMap<>();
+    private final java.util.Map<String,Integer> crossPollN=new java.util.HashMap<>();
+    private static final int MID_CROSS_POLLS=6;   // 官方 nav.MID_CROSS_POLLS (过障碍中途轮询上限)
     private final java.util.Map<String,Integer> doorOscN=new java.util.HashMap<>();
     private final java.util.Map<String,Integer> fakeDoorN=new java.util.HashMap<>();
     // ★现场已打开的门格: 离线图仍标cost2, 但现场可通行 -> 交还正常走路, 不再opener接管。
@@ -4891,6 +4897,8 @@ public final class NavBot implements Plugin {
             openedTiles.put(tx+","+ty+","+mp,t);
             ctx.log("[opener] ★门已开 id="+best.id+" acts="+best.acts+" -> 标记放行("+tx+","+ty+") 交还正常走路");
             crossGateTick.remove("tile@"+tx+","+ty+",p"+mp);
+            crossGateFrom.remove("tile@"+tx+","+ty+",p"+mp);
+            crossPollN.remove("tile@"+tx+","+ty+",p"+mp);
             fakeDoorN.remove(tx+","+ty+","+mp);
             doorOscN.remove("tile@"+tx+","+ty+",p"+mp);
             // 也放行门自身坐标格(实测门object坐标可能与障碍格错开1格, 如11772@3219,3472 vs 障碍格3218,3472)
@@ -4920,17 +4928,48 @@ public final class NavBot implements Plugin {
         //   按障碍格做key, 所有门id抖动累计到同一计数, n>=9正常触发屏蔽绕路。
         String key="tile@"+tx+","+ty+",p"+mp;
         long nowMs=System.currentTimeMillis();
-        // 5) 门6s内开过 -> 不重复toggle, 直接走过。
-        //   ★但门若仍[open](关着)说明上次invoke没生效(acts没翻转)——此时不能套6s防toggle窗,
-        //   否则A/B/D轮换被拖成每级6秒、门迟迟点不开(实测large door 12349卡在3212,3221)。
-        //   门还关着时窗口缩短到800ms, 让A→B→D快速轮换; 真开了(含close)才用完整6s。
+        // ★★★5) 过障碍物判断 (PC官方 crossing at / _sample_work / MID_CROSS_POLLS 1:1) ★★★
+        //   官方语义: 发交互包后进入"过障碍中", 每tick用 _sample_work 对比"发包时位置"与"当前位置":
+        //     · 真位移(moved) -> 判定已过障碍 -> crossing 完成, 标记该格放行(openedTiles), 交还正常走路;
+        //     · 坐标不动 -> 累加 MID_CROSS_POLLS; 窗口内只朝落脚点走, 不重复 toggle(防 A/B/D 抵消);
+        //     · 轮询耗尽仍未过 -> 落到下面重新 opener(A/B/D 换招) / 标 impassable 绕行。
+        //   ★门仍[open](关着)=上次invoke没生效 -> 用800ms短窗让A→B→D快速轮换;
+        //     门真开了(bestClose) -> 用完整6000ms窗只走不点(实测 large door 12349 卡3212,3221 修复)。
         Long last=crossGateTick.get(key);
-        long gateWindow=(bestOpen&&!bestClose)?800L:6000L;
-        if(last!=null&&(nowMs-last)<gateWindow&&!best.stair){
-            int[] cf=crossGateFoot.get(key);
-            int fx=cf!=null?cf[0]:foot[0],fy=cf!=null?cf[1]:foot[1];
-            if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(fx,fy);lastWalkTick=t;}
-            return true;
+        if(last!=null&&!best.stair){
+            long gateAge=nowMs-last;
+            long gateWindow=(bestOpen&&!bestClose)?800L:6000L;
+            // ★官方 _sample_work: 对比发包时坐标 vs 当前坐标判真位移(非时间窗本身)
+            int[] from=crossGateFrom.get(key);
+            boolean moved=(from!=null)&&(from[0]!=mx||from[1]!=my||from[2]!=mp);
+            if(moved){
+                // crossing 完成: 服务器执行了交互且角色发生位移 -> 过完障碍物, 放行交还正常走路
+                crossGateTick.remove(key);crossGateFoot.remove(key);crossGateFrom.remove(key);crossPollN.remove(key);
+                openedTiles.put(otk,t);
+                if(t-lastLogTick>=20){lastLogTick=t;
+                    ctx.log("[opener] ★crossing过完障碍: "+from[0]+","+from[1]+",p"+from[2]+" -> "+mx+","+my+",p"+mp
+                        +" 真位移 -> 放行("+tx+","+ty+") 交还走路");}
+                return false;
+            }
+            if(gateAge<gateWindow){
+                // 坐标未动 & 窗口内: MID_CROSS_POLLS 中途轮询, 只朝落脚点走, 不重复 toggle
+                int pn=crossPollN.containsKey(key)?crossPollN.get(key)+1:1;
+                if(pn>MID_CROSS_POLLS){
+                    // 轮询耗尽仍未过 -> 清状态, 落到下面换招(重新opener) / 达上限标 impassable
+                    crossGateTick.remove(key);crossGateFoot.remove(key);crossGateFrom.remove(key);crossPollN.remove(key);
+                    if(t-lastLogTick>=20){lastLogTick=t;
+                        ctx.log("[opener] ★MID_CROSS_POLLS耗尽("+pn+"/"+MID_CROSS_POLLS+") 坐标未动("+mx+","+my+") -> 换招/绕行");}
+                }else{
+                    crossPollN.put(key,pn);
+                    int[] cf=crossGateFoot.get(key);
+                    int fx=cf!=null?cf[0]:foot[0],fy=cf!=null?cf[1]:foot[1];
+                    if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(fx,fy);lastWalkTick=t;}
+                    if(t-lastLogTick>=30){lastLogTick=t;
+                        ctx.log("[opener] crossing轮询 "+pn+"/"+MID_CROSS_POLLS+" age="+gateAge+"ms acts="
+                            +(bestOpen?"[open]":"")+(bestClose?"[close]":"")+" ->走落脚("+fx+","+fy+")");}
+                    return true;
+                }
+            }
         }
         if(lastDoorInvokeTick>=0&&t-lastDoorInvokeTick<40)return true;
         lastDoorInvokeTick=t;
@@ -4990,7 +5029,12 @@ public final class NavBot implements Plugin {
         }
         ctx.log("[opener] ★invoke["+pathTag+"] id="+best.id+" '"+best.name+"' slot="+slot+" acts="+best.acts+
             " 发包坐标("+ix+","+iy+") 障碍格("+tx+","+ty+") 落脚("+foot[0]+","+foot[1]+") n="+n);
-        if(!best.stair){crossGateTick.put(key,nowMs);crossGateFoot.put(key,foot);}
+        // ★过障碍判断配套写入(官方 _sample_work): 记发包时刻+落脚点+发包时坐标, 重置轮询计数。
+        //   下一tick起 crossing 段用 from vs 当前坐标判真位移, 不再靠纯时间窗猜过没过。
+        if(!best.stair){
+            crossGateTick.put(key,nowMs);crossGateFoot.put(key,foot);
+            crossGateFrom.put(key,new int[]{mx,my,mp});crossPollN.remove(key);
+        }
         doorOscN.put(key,n);
         lastDoorFireMs=nowMs;  // ★_sample_work: _fired_door 期间不计卡住
         // ★PC官方 _working 死磕上限: OBSTACLE_HELD_MAX=150 / OBSTACLE_GRACE=2。
@@ -5020,7 +5064,8 @@ public final class NavBot implements Plugin {
         if(oscillating&&goalNear&&n>=5){
             if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(goalX,goalY);lastWalkTick=t;}
             ctx.log("[opener] ★门振荡(位置集合"+poses.size()+"点) 冲目标 ("+goalX+","+goalY+")");
-            doorOscN.remove(key);crossGateTick.remove(key);pcDoorOscPoses.remove(key);
+            doorOscN.remove(key);crossGateTick.remove(key);crossGateFrom.remove(key);
+            crossPollN.remove(key);pcDoorOscPoses.remove(key);
         }
         return true;
     }
