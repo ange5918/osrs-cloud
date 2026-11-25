@@ -4094,6 +4094,11 @@ public final class NavBot implements Plugin {
     private List<Pt> path=new ArrayList<>(); private int pathIdx=0;
     private long lastWalkTick=-1,lastLogTick=-1,lastInteractTick=-1,legStartTick=-1;
     private int stuckTicks=0,lastX=-1,lastY=-1,interactTries=0;
+    // ★PC官方 _sample_work: _fired_door 非空时不采样(门交互期间位置不变属正常, 不算卡住)。
+    //   端上等价: 每次 opener 发包记录时间戳, 900ms 宽限内不计 stuckTicks。
+    private long lastDoorFireMs=-1;
+    private static final int STUCK_TAPS=6;   // 官方 nav.STUCK_TAPS=5, 端上tick较慢留一档余量
+    private static final long DOOR_FIRE_GRACE_MS=900;
     private boolean finished=false,reachedL2=false;
 
     // ===== ★PC Ghost opener 1:1 移植 (OfficialNav.tryOpenObstacle) =====
@@ -4335,8 +4340,11 @@ public final class NavBot implements Plugin {
             ctx.log("[实时导航] ★★★★到达终点 GE2 "+me);finished=true;return;
         }
 
-        // 卡住检测
-        if(me.getX()==lastX&&me.getY()==lastY) stuckTicks++; else stuckTicks=0;
+        // ★PC官方 _sample_work 等价: _fired_door(门交互)期间不采样; 有位移则重置。
+        long nowMsChk=System.currentTimeMillis();
+        if(nowMsChk-lastDoorFireMs>DOOR_FIRE_GRACE_MS){
+            if(me.getX()==lastX&&me.getY()==lastY) stuckTicks++; else stuckTicks=0;
+        }else stuckTicks=0;
         lastX=me.getX();lastY=me.getY();
 
         // ★差异1(PC官方 _plan_again 真字节码 1:1): REPLAN_PROGRESS=30 位移门槛。
@@ -4347,7 +4355,7 @@ public final class NavBot implements Plugin {
         boolean progress=Math.max(Math.abs(dxPlan),Math.abs(dyPlan))>=REPLAN_PROGRESS;
         boolean layerChanged=me.getPlane()!=lastPlanP;
         boolean goalChanged=(goalX!=lastPlanGoalX||goalY!=lastPlanGoalY||goalP!=lastPlanGoalP);
-        boolean needReplan=path.isEmpty()||pathIdx>=path.size()||layerChanged||goalChanged||progress||stuckTicks>20;
+        boolean needReplan=path.isEmpty()||pathIdx>=path.size()||layerChanged||goalChanged||progress||stuckTicks>STUCK_TAPS;
         // ★PC官方 _refuse_walk: impassable 表出现到期格 -> held.clear + 全路径作废重规划。
         //   必须在 needReplan 之前判, 否则到期格仍以 cost+50 软惩罚留在图上污染路径。
         if(expireBlocksAndReplan())needReplan=true;
@@ -4700,9 +4708,9 @@ public final class NavBot implements Plugin {
                 for(ObsObj o:obs){ if(Math.abs(q[0]-o.x)+Math.abs(q[1]-o.y)<=OBS_NEAR){tx=q[0];ty=q[1];break outer;} }
             }
         }
-        // 兜底2: ★stuck 证据 —— cost2和object距离都没命中, 但玩家卡住(stuckTicks>=12),
-        //   把路径中第一个非脚格当障碍格。PC Ghost on_obstacle 的端上补充。
-        if(tx<0 && stuckTicks>=12){
+        // 兜底2: ★stuck 证据 —— cost2和object距离都没命中, 但玩家卡住,
+        //   把路径中第一个非脚格当障碍格。PC Ghost on_obstacle / _working 的端上补充。
+        if(tx<0 && stuckTicks>=STUCK_TAPS){
             for(int ai=0;ai<ahead.size();ai++){
                 int qx=ahead.get(ai)[0],qy=ahead.get(ai)[1];
                 if(qx==mx&&qy==my)continue;
@@ -4984,6 +4992,7 @@ public final class NavBot implements Plugin {
             " 发包坐标("+ix+","+iy+") 障碍格("+tx+","+ty+") 落脚("+foot[0]+","+foot[1]+") n="+n);
         if(!best.stair){crossGateTick.put(key,nowMs);crossGateFoot.put(key,foot);}
         doorOscN.put(key,n);
+        lastDoorFireMs=nowMs;  // ★_sample_work: _fired_door 期间不计卡住
         // ★PC官方 _working 死磕上限: OBSTACLE_HELD_MAX=150 / OBSTACLE_GRACE=2。
         //   旧实现额外要求"距目标>8"才屏蔽 -> 实测 3213,3222 玩家距中间目标<8 永不触发,
         //   n 涨到20+仍三角震荡。官方无距离条件: 累计交互达阈值即标临时障碍绕路。
