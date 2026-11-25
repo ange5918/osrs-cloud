@@ -4447,7 +4447,7 @@ public final class NavBot implements Plugin {
     /** ★现场源 1:1 PC Ghost: GhostRuntime.api().objects() (id/name/x/y/plane/actions, 经 AndroidOSRS.objectList()->ObjectDefs.get 真值)。
      *  弃用 client.getTileObjects()(用户要求)。装机APK的 objects() 坐标是静态缓存(错报), 故坐标只作score软排序,
      *  开门发包一律用路径cost2算出的障碍格真坐标(tx,ty); 双约束全过滤时回退到def真值门候选。 */
-    private java.util.List<ObsObj> scanObstacles(int px,int py){
+    private java.util.List<ObsObj> scanObstacles(int px,int py,int myPlane){
         java.util.List<ObsObj> out=new java.util.ArrayList<>();
         try{
             java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
@@ -4532,9 +4532,10 @@ public final class NavBot implements Plugin {
                     //   严格 tp==myPlane 会把脚下真门全丢 -> 退回 objects() 静态错值11772 ->
                     //   误判"门已开->直接走过" -> 顶着关门卡死。放宽到相邻层, 由 ranked 的 dMe 排序
                     //   把真正贴身的那扇门排第一。
-                    int myPlane;
-                    try{ myPlane=client.getPlane(); }catch(Throwable e){ myPlane=tp; }
-                    if(Math.abs(tp-myPlane)>1)continue;
+                    // ★用路径真值层(myPlane, 来自 me=WorldPoint)过滤, 不用 client.getPlane()(native报p1错位)。
+                    //   实测坑: 玩家路径真值p0, client报p1 -> 相邻层放行把p1的门1535当p0障碍格的门,
+                    //   truthTile免过滤+负分排最前 -> 反复点p1门点不开, p0原地来回震荡。
+                    if(tp!=myPlane)continue;
                     java.util.List<String> ta=new java.util.ArrayList<>();
                     String da=doorActs(oid);
                     if(!da.isEmpty()) for(String part:da.split(",")) if(!part.trim().isEmpty()) ta.add(part.trim().toLowerCase());
@@ -4629,7 +4630,7 @@ public final class NavBot implements Plugin {
      *  假门证伪/门已开/防toggle -> invoke + 振荡检测。 */
     private boolean tryOpenObstacle(WorldPoint me,long t){
         int mx=me.getX(),my=me.getY(),mp=me.getPlane();
-        java.util.List<ObsObj> obs=scanObstacles(mx,my);
+        java.util.List<ObsObj> obs=scanObstacles(mx,my,mp);
         // 1) 路径前方(同层、地图内)路径点
         java.util.List<int[]> ahead=new java.util.ArrayList<>();
         for(int i=pathIdx;i<path.size();i++){
@@ -5000,7 +5001,7 @@ public final class NavBot implements Plugin {
         }
         if(ahead.size()<2)return null;
         // 地图内障碍object集合(现场真值, scanObstacles 已按白名单过滤)
-        java.util.List<ObsObj> obs=scanObstacles(mx,my);
+        java.util.List<ObsObj> obs=scanObstacles(mx,my,mp);
         // 情形1: 前方路径点命中障碍 -> 停在障碍前一格
         for(int a=0;a<ahead.size();a++){
             int wx=ahead.get(a)[0],wy=ahead.get(a)[1];
