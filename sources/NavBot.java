@@ -4369,15 +4369,20 @@ public final class NavBot implements Plugin {
             //   而 findLiveStair 抓到旁边 56231(单向 Bottom-floor, Climb-down slot0/op88)@3205,3208,
             //   点它服务器不执行 -> 卡死反复重规划。修法: ed.oid 存在时以它为准, 现场只在 id 匹配时才校正坐标。
             int[] live=findLiveStair(prev.x,prev.y,target.x,target.y);
+            // ★按 oid+当前plane 找现场楼梯真坐标(官方边的 ed.sx/sy 是路径起点格, 不是楼梯锚点)。
+            //   实测: 玩家(3206,3208,p1)下楼 ed.oid=16672, 现场16672真坐标@3204,3207,p1;
+            //   用ed起点3206,3208或56231@3205,3208(p2)发op0服务器都不执行, 用真坐标3204,3207才对。
+            int[] byOid=(ed!=null)?findStairByOidAtPlane(ed.oid,me.getPlane(),me.getX(),me.getY()):null;
             boolean liveHit=(live!=null);
             boolean liveUsed=false;
             if(ed!=null){
-                oid=ed.oid; sx=ed.sx; sy=ed.sy;           // 官方图真值优先
-                if(liveHit&&live[0]==ed.oid){sx=live[1];sy=live[2];liveUsed=true;} // id一致才用现场坐标
+                oid=ed.oid; sx=ed.sx; sy=ed.sy;           // 官方图真值(oid)优先
+                if(byOid!=null){sx=byOid[0];sy=byOid[1];liveUsed=true;} // ★oid+plane现场真坐标
+                else if(liveHit&&live[0]==ed.oid){sx=live[1];sy=live[2];liveUsed=true;}
             }else if(liveHit){oid=live[0];sx=live[1];sy=live[2];liveUsed=true;}   // 无ed才全用现场
             ctx.log("[实时导航] ↑楼梯 oid链="+(ed!=null?"ed.oid="+ed.oid:"guessOid="+guessOid(prev.p,target.p))+
                 " 现场="+(liveHit?"id="+live[0]+"@"+live[1]+","+live[2]:"miss")+
-                (liveHit&&!liveUsed?"(现场id不匹配,弃)":"")+" 采用="+oid+"@"+sx+","+sy);
+                " oid同层="+(byOid!=null?byOid[0]+","+byOid[1]:"miss")+" 采用="+oid+"@"+sx+","+sy);
             // ★交互距离用曼哈顿(PC Ghost: 必须走到物体相邻格才能交互)。
             //   max距离会把斜对角(max=2)误判为"够近"而狂发包, 实际楼梯在斜对角op88不生效。
             int sd=Math.abs(sx-me.getX())+Math.abs(sy-me.getY());
@@ -5100,6 +5105,26 @@ public final class NavBot implements Plugin {
             }
             ctx.log("[楼梯诊断] 共"+n+"个楼梯object");
         }catch(Throwable e){ctx.log("[楼梯诊断] ERR "+e);}
+    }
+    /** 按 object id + 当前 plane 找现场真坐标(取距玩家最近的一个), 返回{x,y}; 找不到 null。
+     *  官方跨层边的 ed.sx/sy 是路径起点格, 不是楼梯 object 锚点; 必须用现场同层 object 坐标发包。 */
+    private int[] findStairByOidAtPlane(int oid,int plane,int px,int py){
+        int bx=0,by=0,bd=Integer.MAX_VALUE;
+        try{
+            java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
+            if(all==null)return null;
+            for(java.util.Map<String,Object> m:all){
+                if(m==null)continue;
+                int id=m.get("id") instanceof Number?((Number)m.get("id")).intValue():0;
+                int pl=m.get("plane") instanceof Number?((Number)m.get("plane")).intValue():0;
+                if(id!=oid||pl!=plane)continue;
+                int x=m.get("x") instanceof Number?((Number)m.get("x")).intValue():0;
+                int y=m.get("y") instanceof Number?((Number)m.get("y")).intValue():0;
+                int d=Math.abs(x-px)+Math.abs(y-py);
+                if(d<bd){bd=d;bx=x;by=y;}
+            }
+        }catch(Throwable e){}
+        return bd==Integer.MAX_VALUE?null:new int[]{bx,by};
     }
     /** ★PC Ghost findLiveStair 1:1: 现场 GhostRuntime.api().objects() 读楼梯真 id+坐标。
      *  匹配 prev/target 附近3格内、name/actions 含 stair/climb/ladder/trapdoor/hatch 的 object。
