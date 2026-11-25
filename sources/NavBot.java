@@ -990,6 +990,9 @@ public final class NavBot implements Plugin {
             }
         }
         if(tx<0)return false;
+        // ★PC Ghost 只处理贴身障碍: 远处的 cost2 边先正常走路靠近, 不提前 invoke
+        //   (实测会拿远处门 id 对着障碍格空发, 玩家原地打转)。
+        if(Math.abs(tx-mx)+Math.abs(ty-my)>4)return false;
         // 障碍格就在脚下: 先试走一次(官方on_obstacle), 走不动下面再点object
         int[] foot=crossFoot(mx,my,tx,ty,ahead);
         if(mx==tx&&my==ty){
