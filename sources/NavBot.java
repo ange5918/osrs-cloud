@@ -4124,6 +4124,9 @@ public final class NavBot implements Plugin {
     private static final int OBSTACLE_HELD_MAX=150;    // nav.OBSTACLE_HELD_MAX (官方死磕上限)
     private static final int OBSTACLE_GRACE=2;         // nav.OBSTACLE_GRACE
     private long lastBlockClearMs=-1;
+    // ★大步目标锁定: PC官方 _big_step_goal 选定后持续走到接近才重选; 端上旧实现每tick
+    //   new Random().nextInt(top) 重选 -> 方向反复翻转(玩家3200,3235↔3204,3243来回横跳)。
+    private int bigGoalX=-1,bigGoalY=-1,bigGoalP=-1; private long bigGoalTick=-1;
 
     // ===== ★★PC Ghost 官方执行层 1:1 移植 (ghost_navigator_live.py) =====
     // 差异1: 重规划(PC Navigator._plan_again 真字节码 1:1)。
@@ -4361,6 +4364,7 @@ public final class NavBot implements Plugin {
                 stuckTicks=0; return;
             }
             path=p;pathIdx=0;stuckTicks=0;lastWalkTick=-1;
+            bigGoalX=-1;bigGoalY=-1;bigGoalTick=-1;   // 路径变了, 旧大步目标失效
             lastPlanX=me.getX();lastPlanY=me.getY();lastPlanP=me.getPlane();
             lastPlanGoalX=goalX;lastPlanGoalY=goalY;lastPlanGoalP=goalP;
             StringBuilder pb=new StringBuilder("[实时导航] 规划 "+p.size()+"步 "+me.getX()+","+me.getY()+",p"+me.getPlane()+" -> "+goalName+" 路径=");
@@ -5061,7 +5065,10 @@ public final class NavBot implements Plugin {
                 return prev;
             }
         }
-        // 情形2: 无障碍 -> 最远 FAR_TOP 个里随机选一个
+        // 情形2: 无障碍 -> 最远 FAR_TOP 个里选一个。
+        // ★PC官方 _big_step_goal: 大步目标选定后持续走, 不是每tick重掷(端上旧bug: 每15tick
+        //   new Random() 重选 -> 方向反复翻转 = 用户说的"上下都点/来回横跳")。
+        //   锁定条件: 目标仍在 ahead(同层地图内)且未走完(d>1)且未超时(10s) -> 复用; 否则重选。
         java.util.List<int[]> far=new java.util.ArrayList<>(ahead);
         java.util.Collections.sort(far,new java.util.Comparator<int[]>(){
             public int compare(int[] a,int[] b){
@@ -5070,9 +5077,17 @@ public final class NavBot implements Plugin {
                 return Long.compare(db,da);
             }
         });
+        long now=System.currentTimeMillis();
+        boolean lockValid=bigGoalX>=0&&bigGoalP==mp&&bigGoalTick>=0&&(now-bigGoalTick)<10000L
+            &&Math.max(Math.abs(bigGoalX-mx),Math.abs(bigGoalY-my))>1;
+        if(lockValid){
+            for(int[] q:far) if(q[0]==bigGoalX&&q[1]==bigGoalY) return new int[]{bigGoalX,bigGoalY};
+        }
         int top=Math.min(FAR_TOP,far.size());
         int chosen=new java.util.Random().nextInt(top);
-        return far.get(chosen);
+        int[] pick=far.get(chosen);
+        bigGoalX=pick[0];bigGoalY=pick[1];bigGoalP=mp;bigGoalTick=now;
+        return pick;
     }
 
     /** object1(op88)通用发包: 门Open(slot0)。payload与sendStair opt1一致。 */
