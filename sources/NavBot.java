@@ -919,9 +919,13 @@ public final class NavBot implements Plugin {
                     dumpN++;
                 }
                 if(!hit)continue;
+                // ★楼梯/梯子不进opener候选: 跨层交互由专门的跨层分支处理, opener只管门/闸等挡路障碍。
+                //   否则 opener 会把 staircase(climb-up) 当障碍狂点(实测 n=20) 且卡住玩家。
+                boolean isStair=isStairName(nm);
+                for(String a:acts) if(a.startsWith("climb")){isStair=true;break;}
+                if(isStair)continue;
                 ObsObj oo=new ObsObj(); oo.id=id; oo.x=x; oo.y=y; oo.pl=pl;
-                oo.name=nm; oo.acts=acts; oo.stair=isStairName(nm);
-                for(String a:acts) if(a.startsWith("climb")){oo.stair=true;break;}
+                oo.name=nm; oo.acts=acts; oo.stair=false;
                 out.add(oo);
             }
         }catch(Throwable e){ctx.log("[opener诊断] EX "+e);}
@@ -1021,10 +1025,13 @@ public final class NavBot implements Plugin {
                 for(String a:o.acts){ if(a.equals("open")||a.equals("close")){isDoor=true;break;} }
                 if(!isDoor)continue;
                 if(o.pl!=mp)continue;  // ★真plane已可用: 只取同层门, 排除p0/p2远处门
-                int actRank=0; for(String a:o.acts){ if(a.equals("open")){actRank=0;break;} }
-                // ★native真坐标已可用: 按离障碍格距离排序, 选面前最近的门(而非第一个)
+                // ★actions 真值判门开关(PG同款): [Close]=门已开可通行 -> 最高优先级(触发直接走过);
+                //   [Open]=门关需开 -> 次优先。避免选到远处静态缓存的11773[open]反复开门。
+                boolean isOpenState=false;
+                for(String a:o.acts){ if(a.equals("close"))isOpenState=true; }
+                // ★距离优先(面前最近的门才是关键), 已开[Close]作同距离的tie-break。
                 int d=Math.abs(o.x-tx)+Math.abs(o.y-ty);
-                ranked.add(new int[]{oi,0,d,actRank*10000 + d*100});
+                ranked.add(new int[]{oi,0,d,d*100 + (isOpenState?0:1)});
             }
         }
         // 4) 假门证伪: 有障碍格但无object候选 -> 计3次直接走过
