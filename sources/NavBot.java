@@ -876,49 +876,44 @@ public final class NavBot implements Plugin {
      *  该 API 端上经 AndroidOSRS.objectList() -> ObjectDefs.get(oid) 查真实 name+actions, 关门=11773[Open]/开门=11774[Close],
      *  并带真 plane。白名单 = name 命中 OR 任一 action 在 PASS_ACTS (与 OfficialNav.scanObstacles 完全一致)。 */
     private boolean obsDumped=false;
+    /** ★现场源用 client.getTileObjects() (玩家视野现场object, 门报在贴脸3218,3471)。
+     *  装机APK的 GhostRuntime.api().objects() 是旧版全场景静态缓存, 门全是p0远处、玩家面前的门不在列表 -> opener失效。
+     *  name/actions 真值仍按 DOOR_ACTS(官方ObjectDef.actions) 覆盖, 等价PC Ghost。 */
     private java.util.List<ObsObj> scanObstacles(int px,int py){
         java.util.List<ObsObj> out=new java.util.ArrayList<>();
         try{
-            java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
+            java.util.List<com.astrastudio.api.model.TileObject> all=client.getTileObjects();
             if(!obsDumped){
                 obsDumped=true;
-                ctx.log("[opener诊断] objects() 共 "+(all==null?0:all.size())+" 个");
+                ctx.log("[opener诊断] getTileObjects() 共 "+(all==null?0:all.size())+" 个");
             }
             if(all==null)return out;
             int dumpN=0;
-            for(java.util.Map<String,Object> m:all){
-                if(m==null)continue;
-                int id=m.get("id") instanceof Number?((Number)m.get("id")).intValue():0;
+            for(com.astrastudio.api.model.TileObject o:all){
+                if(o==null)continue;
+                int id=o.getId();
                 if(id<=0)continue;
-                String nm=String.valueOf(m.getOrDefault("name","")).toLowerCase();
-                int x=m.get("x") instanceof Number?((Number)m.get("x")).intValue():0;
-                int y=m.get("y") instanceof Number?((Number)m.get("y")).intValue():0;
-                int pl=m.get("plane") instanceof Number?((Number)m.get("plane")).intValue():0;
-                java.util.List<String> acts=new java.util.ArrayList<>();
-                Object raw=m.get("actions");
-                if(raw instanceof java.util.List) for(Object a:(java.util.List<?>)raw) if(a!=null) acts.add(String.valueOf(a).toLowerCase());
-                // ★权威真值覆盖 (绕开装机 APK 假动作 bug):
-                //   旧版 AndroidOSRS.objectList() 给每个 object 塞 [interact,open,climb-up,climb-down],
-                //   满场 object 都假 HIT。凡 DOOR_ACTS 表命中该 def id -> 用官方 actions 真值覆盖
-                //   (关门 11773=[Open] / 开门 11774=[Close]); 未命中但带假动作四件套 -> 清空, 不当障碍。
+                com.astrastudio.api.model.WorldPoint wp=o.getWorldLocation(); if(wp==null)continue;
+                int x=wp.getX(), y=wp.getY(), pl=wp.getPlane();
+                String nm=o.getName()==null?"":o.getName().toLowerCase();
+                // 距离过滤: 只保留玩家附近(现场), 与PC Ghost objects().near 等价。
+                int dd=Math.abs(x-px)+Math.abs(y-py); if(dd>5)continue;
+                // ★权威真值: name 用设备getName()真名(历史证据'door'), actions 用内嵌DOOR_ACTS官方表(等价PC Ghost ObjectDefs.get)。
+                //   不用 ObjectDefs.get(id) —— dex classpath 里没有该类(只在APK classes3.dex), 会编译失败。
+                String realName=nm;
                 String defActs=doorActs(id);
-                boolean fakeActs=acts.contains("interact")&&acts.contains("open")
-                                 &&acts.contains("climb-up")&&acts.contains("climb-down");
-                if(!defActs.isEmpty()){
-                    acts.clear();
-                    for(String part:defActs.split(",")) acts.add(part.trim().toLowerCase());
-                }else if(fakeActs){
-                    acts.clear();
-                }
-                boolean hit=isObsName(nm);
+                String actsHint=defActs;
+                java.util.List<String> acts=new java.util.ArrayList<>();
+                for(String part:actsHint.split(",")) if(!part.trim().isEmpty()) acts.add(part.trim().toLowerCase());
+                boolean hit=isObsName(realName);
                 for(String a:acts) if(isPassAct(a)){hit=true;break;}
                 if(dumpN<24 || hit){
-                    ctx.log("[opener诊断] "+(hit?"HIT ":"    ")+"id="+id+" name='"+nm+"' @("+x+","+y+",p"+pl+") acts="+acts+(defActs.isEmpty()?"":"(def真值)"));
+                    ctx.log("[opener诊断] "+(hit?"HIT ":"    ")+"id="+id+" name='"+realName+"' @("+x+","+y+",p"+pl+") acts="+acts+(defActs.isEmpty()?"":"(def真值)"));
                     dumpN++;
                 }
                 if(!hit)continue;
                 ObsObj oo=new ObsObj(); oo.id=id; oo.x=x; oo.y=y; oo.pl=pl;
-                oo.name=nm; oo.acts=acts; oo.stair=isStairName(nm);
+                oo.name=realName; oo.acts=acts; oo.stair=isStairName(realName);
                 for(String a:acts) if(a.startsWith("climb")){oo.stair=true;break;}
                 out.add(oo);
             }
