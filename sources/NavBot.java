@@ -4115,9 +4115,15 @@ public final class NavBot implements Plugin {
     private final java.util.Map<String,Integer> fakeDoorN=new java.util.HashMap<>();
     // ★现场已打开的门格: 离线图仍标cost2, 但现场可通行 -> 交还正常走路, 不再opener接管。
     private final java.util.Map<String,Long> openedTiles=new java.util.HashMap<>();
-    // ★PC同款防死循环: 现场确认走不通的"假障碍格"加入屏蔽集, astar 绕路(而非无限撞同一格)。
-    //   实测 3203,3476 p2 对着 3203,3475 假门空发 139 tick 卡死, 根因就是假门证伪不屏蔽+重规划又选同一格。
-    private final java.util.Set<Long> blockedTiles=new java.util.HashSet<>();
+    // ★PC官方 CollisionMap.impassable 1:1: 带时效的临时障碍 {tile: untilMs}。
+    //   官方 _block_for_walk -> cmap.mark_impassable(x,y,plane,seconds=60.0) 记录动态障碍;
+    //   _refuse_walk 检测 held 中 until<=now 的格子 -> held.clear() + path=None 重规划。
+    //   旧实现用永久 Set 导致假门格永久污染图; 这里改为 60s 时效(IMPASSABLE_SECONDS 真值)。
+    private final java.util.Map<Long,Long> blockedTiles=new java.util.HashMap<>();
+    private static final long IMPASSABLE_MS=60_000L;   // collision.IMPASSABLE_SECONDS=60.0
+    private static final int OBSTACLE_HELD_MAX=150;    // nav.OBSTACLE_HELD_MAX (官方死磕上限)
+    private static final int OBSTACLE_GRACE=2;         // nav.OBSTACLE_GRACE
+    private long lastBlockClearMs=-1;
 
     // ===== ★★PC Ghost 官方执行层 1:1 移植 (ghost_navigator_live.py) =====
     // 差异1: 重规划(PC Navigator._plan_again 真字节码 1:1)。
@@ -4203,6 +4209,31 @@ public final class NavBot implements Plugin {
         ctx.log("[实时导航] ★目标 "+n+" ("+x+","+y+",p"+p+")");
     }
     private static long key(int x,int y,int p){return ((long)x<<24)|((long)y<<2)|p;}
+    // ★PC官方 cmap.impassable 时效语义: until>now 才算障碍; 到期单个失效(held.clear 同款)。
+    private boolean isBlockedNow(long tileKey){
+        Long until=blockedTiles.get(tileKey);
+        if(until==null)return false;
+        if(until>System.currentTimeMillis())return true;
+        blockedTiles.remove(tileKey);
+        return false;
+    }
+    private void markBlocked(int x,int y,int p){
+        blockedTiles.put(key(x,y,p),System.currentTimeMillis()+IMPASSABLE_MS);
+    }
+    // ★官方 _refuse_walk: held 中出现到期格 -> held.clear + 全路径作废重规划(避免临时障碍永久污染图)。
+    private boolean expireBlocksAndReplan(){
+        long now=System.currentTimeMillis(); boolean anyExpired=false;
+        for(java.util.Map.Entry<Long,Long> e:blockedTiles.entrySet())
+            if(e.getValue()<=now){anyExpired=true;break;}
+        if(anyExpired){
+            int cnt=blockedTiles.size();
+            blockedTiles.clear(); path.clear(); pathIdx=0; lastWalkTick=-1;
+            lastBlockClearMs=now;
+            ctx.log("[opener] ★impassable到期("+cnt+"格) held.clear + 重规划 (PC _refuse_walk同款)");
+            return true;
+        }
+        return false;
+    }
     // 官方 steps3(x,y,p) 邻居: 直接读邻接表, 返回 [(nx,ny,np,cost)...]
     private int steps3(int x,int y,int p,int[] out){
         if(x<X0||x>X1||y<Y0||y>Y1||p<0||p>=PL) return 0;
@@ -4273,7 +4304,7 @@ public final class NavBot implements Plugin {
                 // ★已证伪的假障碍格: 软惩罚绕路(不硬断)。硬断会在唯一通路被堵死时
                 //   触发 onTick "无路->清空屏蔽->又选回原格" 的震荡(实测 GE 区 353->374->366 步抖动)。
                 //   软惩罚保证 A* 恒有路, 优先绕行; 真无替代时仍走该格(不再原地打转)。
-                if(blockedTiles.contains(key(nx,ny,np))) cost += 50;
+                if(isBlockedNow(key(nx,ny,np))) cost += 50;
                 // ★现场已打开的门格: 离线图仍标cost2, 放行成cost1 -> 走短路(如31步而非绕路58步)
                 if(openedTiles.containsKey(nx+","+ny+","+np) && cost>1) cost=1;
                 double ng=c.g+cost;
@@ -4314,6 +4345,9 @@ public final class NavBot implements Plugin {
         boolean layerChanged=me.getPlane()!=lastPlanP;
         boolean goalChanged=(goalX!=lastPlanGoalX||goalY!=lastPlanGoalY||goalP!=lastPlanGoalP);
         boolean needReplan=path.isEmpty()||pathIdx>=path.size()||layerChanged||goalChanged||progress||stuckTicks>20;
+        // ★PC官方 _refuse_walk: impassable 表出现到期格 -> held.clear + 全路径作废重规划。
+        //   必须在 needReplan 之前判, 否则到期格仍以 cost+50 软惩罚留在图上污染路径。
+        if(expireBlocksAndReplan())needReplan=true;
         if(needReplan){
             List<Pt> p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
             // ★屏蔽已改为 A* 软惩罚(cost+50), 恒有路; 不再清空屏蔽重算(那是震荡根因)。
@@ -4805,9 +4839,9 @@ public final class NavBot implements Plugin {
                 //   另一侧, 玩家够不到会永远卡住(实测 3202,3476 卡死)。持续尝试到位置变化。
                 if(lastWalkTick<0||t-lastWalkTick>=10){client.walkTo(tx,ty);lastWalkTick=t;}
                 // ★PC同款防死循环: 该格已现场证伪为假障碍, 本段路径屏蔽并立即重规划绕路
-                blockedTiles.add(key(tx,ty,mp));
+                markBlocked(tx,ty,mp);   // ★官方 mark_impassable(seconds=60) 带时效
                 path.clear(); pathIdx=0; lastWalkTick=-1;
-                ctx.log("[opener] ★假门证伪 走过 ("+tx+","+ty+") me="+mx+","+my+" n="+n+" -> 屏蔽并绕路");
+                ctx.log("[opener] ★假门证伪 走过 ("+tx+","+ty+") me="+mx+","+my+" n="+n+" -> mark_impassable(60s)并绕路");
                 return true;
             }
             return false;
@@ -4938,10 +4972,13 @@ public final class NavBot implements Plugin {
             " 发包坐标("+ix+","+iy+") 障碍格("+tx+","+ty+") 落脚("+foot[0]+","+foot[1]+") n="+n);
         if(!best.stair){crossGateTick.put(key,nowMs);crossGateFoot.put(key,foot);}
         doorOscN.put(key,n);
-        // PC 防死循环: A(2)+B(3)+D(1) 全无效(>=9次) -> 判定假门, 屏蔽并绕路
-        if(n>=9&&Math.abs(mx-goalX)+Math.abs(my-goalY)>8){
-            ctx.log("[opener] ★A/B/D 全无效 n="+n+" -> 屏蔽障碍格并绕路");
-            blockedTiles.add(key(tx,ty,mp));
+        // ★PC官方 _working 死磕上限: OBSTACLE_HELD_MAX=150 / OBSTACLE_GRACE=2。
+        //   旧实现额外要求"距目标>8"才屏蔽 -> 实测 3213,3222 玩家距中间目标<8 永不触发,
+        //   n 涨到20+仍三角震荡。官方无距离条件: 累计交互达阈值即标临时障碍绕路。
+        //   A(2)+B(3)+D(1) 全无效(n>=9) 或 死磕达 OBSTACLE_HELD_MAX -> mark_impassable 绕行。
+        if(n>=9||n>=OBSTACLE_HELD_MAX){
+            ctx.log("[opener] ★A/B/D全无效 n="+n+"(held<="+OBSTACLE_HELD_MAX+") -> mark_impassable(60s)绕路");
+            markBlocked(tx,ty,mp);
             path.clear(); pathIdx=0; lastWalkTick=-1;
         }
         // 7) ★门振荡(PC door_osc 1:1): 记录同门最近位置集合; 判定"在门两侧几个点间来回、
