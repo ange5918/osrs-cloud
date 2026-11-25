@@ -4276,7 +4276,9 @@ public final class NavBot implements Plugin {
                 stuckTicks=0; return;
             }
             path=p;pathIdx=0;stuckTicks=0;lastWalkTick=-1;
-            ctx.log("[实时导航] 规划 "+p.size()+"步 "+me.getX()+","+me.getY()+",p"+me.getPlane()+" -> "+goalName);
+            StringBuilder pb=new StringBuilder("[实时导航] 规划 "+p.size()+"步 "+me.getX()+","+me.getY()+",p"+me.getPlane()+" -> "+goalName+" 路径=");
+            for(int pi=0;pi<p.size()&&pi<8;pi++){Pt pp=p.get(pi);pb.append(pp.x).append(",").append(pp.y).append("p").append(pp.p).append(" ");}
+            ctx.log(pb.toString());
         }
         if(lastLogTick<0||t-lastLogTick>=50){
             lastLogTick=t;
