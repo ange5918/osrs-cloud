@@ -1075,9 +1075,12 @@ public final class NavBot implements Plugin {
             String fk=tx+","+ty+","+mp;
             int n=fakeDoorN.containsKey(fk)?fakeDoorN.get(fk)+1:1; fakeDoorN.put(fk,n);
             if(n>=3){
-                if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(foot[0],foot[1]);lastWalkTick=t;}
-                ctx.log("[opener] ★假门证伪 走过 ("+tx+","+ty+")->("+foot[0]+","+foot[1]+") n="+n);
-                fakeDoorN.remove(fk); return true;
+                // ★假门证伪: cost2 是 walkgraph 误标, 现场无真门 -> 直接朝障碍格本身走,
+                //   靠官方引擎走进去(若是假门则可通行)。绝不 walkTo(foot): foot 在障碍格
+                //   另一侧, 玩家够不到会永远卡住(实测 3202,3476 卡死)。持续尝试到位置变化。
+                if(lastWalkTick<0||t-lastWalkTick>=10){client.walkTo(tx,ty);lastWalkTick=t;}
+                ctx.log("[opener] ★假门证伪 走过 ("+tx+","+ty+") me="+mx+","+my+" n="+n);
+                return true;
             }
             return false;
         }
