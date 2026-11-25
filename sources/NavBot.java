@@ -883,11 +883,39 @@ public final class NavBot implements Plugin {
      *  该 API 端上经 AndroidOSRS.objectList() -> ObjectDefs.get(oid) 查真实 name+actions, 关门=11773[Open]/开门=11774[Close],
      *  并带真 plane。白名单 = name 命中 OR 任一 action 在 PASS_ACTS (与 OfficialNav.scanObstacles 完全一致)。 */
     private boolean obsDumped=false;
+    private boolean baseDumped=false;
+    /** ★临时坐标真值诊断: 同时打印 native base/coord 与关键 object 的 scene local 坐标。 */
+    private void dumpCoordTruth(){
+        if(baseDumped)return;
+        baseDumped=true;
+        try{
+            Class<?> nb=null;
+            try{ nb=Class.forName("com.astrastudio.runtime.internal.NativeBridge"); }
+            catch(Throwable e){ nb=Class.forName("com.astrastudio.runtime.internal.NativeBridge",true,NavBot.class.getClassLoader()); }
+            int[] c=(int[])nb.getMethod("nativeReadCoord").invoke(null);
+            int[] b=(int[])nb.getMethod("nativeReadLocalBase").invoke(null);
+            int[] raw=(int[])nb.getMethod("nativeListObjects",int.class).invoke(null,4096);
+            StringBuilder d=new StringBuilder("[坐标诊断] coord="+java.util.Arrays.toString(c)
+                +" nativeBase(wx,wy,lx,ly)="+java.util.Arrays.toString(b)+" rawN="+(raw==null?0:raw.length/6));
+            if(raw!=null){
+                int shown=0;
+                for(int i=0;i+5<raw.length&&shown<16;i+=6){
+                    int oid=raw[i+1];
+                    if(oid!=11807&&oid!=11801&&oid!=11802&&oid!=50051&&oid!=11773)continue;
+                    d.append(" |oid=").append(oid).append("@local(")
+                     .append(raw[i+2]).append(',').append(raw[i+3]).append(",p").append(raw[i+5]).append(')');
+                    shown++;
+                }
+            }
+            ctx.log(d.toString());
+        }catch(Throwable e){ctx.log("[坐标诊断] EX "+e);}
+    }
     /** ★现场源 1:1 PC Ghost: GhostRuntime.api().objects() (id/name/x/y/plane/actions, 经 AndroidOSRS.objectList()->ObjectDefs.get 真值)。
      *  弃用 client.getTileObjects()(用户要求)。装机APK的 objects() 坐标是静态缓存(错报), 故坐标只作score软排序,
      *  开门发包一律用路径cost2算出的障碍格真坐标(tx,ty); 双约束全过滤时回退到def真值门候选。 */
     private java.util.List<ObsObj> scanObstacles(int px,int py){
         java.util.List<ObsObj> out=new java.util.ArrayList<>();
+        dumpCoordTruth();
         try{
             java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
             if(!obsDumped){
