@@ -4113,6 +4113,8 @@ public final class NavBot implements Plugin {
     private final java.util.Map<String,int[]> crossGateFoot=new java.util.HashMap<>();
     private final java.util.Map<String,Integer> doorOscN=new java.util.HashMap<>();
     private final java.util.Map<String,Integer> fakeDoorN=new java.util.HashMap<>();
+    // ★现场已打开的门格: 离线图仍标cost2, 但现场可通行 -> 交还正常走路, 不再opener接管。
+    private final java.util.Map<String,Long> openedTiles=new java.util.HashMap<>();
     // ★PC同款防死循环: 现场确认走不通的"假障碍格"加入屏蔽集, astar 绕路(而非无限撞同一格)。
     //   实测 3203,3476 p2 对着 3203,3475 假门空发 139 tick 卡死, 根因就是假门证伪不屏蔽+重规划又选同一格。
     private final java.util.Set<Long> blockedTiles=new java.util.HashSet<>();
@@ -4571,6 +4573,14 @@ public final class NavBot implements Plugin {
             }
         }
         if(tx<0)return false;
+        // ★现场已开门格: 离线图仍标cost2, 但门已开现场可通行 -> 不再opener接管, 交还正常走路逐格推进。
+        //   实测门开后此分支每tick return true却只walkTo(门另一侧2格外), 客户端拒走 -> 卡死step2/24。
+        String otk=tx+","+ty+","+mp;
+        Long openedAt=openedTiles.get(otk);
+        if(openedAt!=null){
+            if(t-openedAt<180){ return false; }   // 3分钟内交还正常走路
+            else openedTiles.remove(otk);         // 超时重新验证(门可能被别人关上)
+        }
         // ★★★障碍格权威真值: 直接读该格 tile slot。命中即以现场 id/name/actions 为准,
         //   不再用 objects() 的错报坐标做双约束(这正是之前 name/action 找不到/找错的根因)。
         boolean tileHit=false;
@@ -4718,11 +4728,15 @@ public final class NavBot implements Plugin {
             ctx.log(dbg.toString()); lastOpenerDiag=t;
         }
         if(bestClose&&!bestOpen&&!best.stair){
-            ctx.log("[opener] ★门已开 id="+best.id+" acts="+best.acts+" -> 直接走过("+foot[0]+","+foot[1]+")");
-            if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(foot[0],foot[1]);lastWalkTick=t;}
+            // ★门已开: 标记该格已放行并交还正常走路(逐格target推进), 不再每tick walkTo(门另一侧)卡死。
+            openedTiles.put(tx+","+ty+","+mp,t);
+            ctx.log("[opener] ★门已开 id="+best.id+" acts="+best.acts+" -> 标记放行("+tx+","+ty+") 交还正常走路");
             crossGateTick.remove(best.id+"@"+tx+","+ty);
             fakeDoorN.remove(tx+","+ty+","+mp);
-            return true;
+            doorOscN.remove(best.id+"@"+tx+","+ty);
+            // 也放行门自身坐标格(实测门object坐标可能与障碍格错开1格, 如11772@3219,3472 vs 障碍格3218,3472)
+            openedTiles.put(best.x+","+best.y+","+mp,t);
+            return false;
         }
         // ★key用障碍格真坐标(tx,ty), 不用设备错报的best.x,best.y(否则防toggle失效)
         String key=best.id+"@"+tx+","+ty;
