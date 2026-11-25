@@ -4118,6 +4118,18 @@ public final class NavBot implements Plugin {
     // ★PC同款防死循环: 现场确认走不通的"假障碍格"加入屏蔽集, astar 绕路(而非无限撞同一格)。
     //   实测 3203,3476 p2 对着 3203,3475 假门空发 139 tick 卡死, 根因就是假门证伪不屏蔽+重规划又选同一格。
     private final java.util.Set<Long> blockedTiles=new java.util.HashSet<>();
+
+    // ===== ★★PC Ghost 官方执行层 1:1 移植 (ghost_navigator_live.py) =====
+    // 差异1: 每步重规划(PC Navigator.step 内部 _plan_again)。用位置/plane变化作 base_source。
+    private int lastPlanX=-1,lastPlanY=-1,lastPlanP=-1;
+    // 差异3: 大步走参数(MAP_R 已有=16)。FAR_TOP=无障碍时取地图内最远5点随机。
+    private static final int FAR_TOP=5, OBS_NEAR_PC=2;
+    // 差异4: 位移型障碍(invoke自身位移) —— PC DISPLACE_ACTS, invoke后不walk-through落脚点
+    private static final String[] DISPLACE_ACTS={"climb-over","climb over","cross",
+        "squeeze-through","squeeze through","jump","jump-to","jump to","enter","quick-enter","climb"};
+    private int dispX=-1,dispY=-1,dispP=-1; private long dispTick=-1; // invoke前位置, 等变化交回重规划
+    // 差异5: 防卡三件套对齐PC。door_osc位置集合震荡检测 + fake_door附近门阈值。
+    private final java.util.Map<String,java.util.Set<Long>> pcDoorOscPoses=new java.util.HashMap<>(); // 门->最近位置集合
     private static final class ObsObj { int id,x,y,pl; String name; java.util.List<String> acts; boolean stair; boolean truthTile; }
 
     public void configure(PluginContext c){
@@ -4289,8 +4301,11 @@ public final class NavBot implements Plugin {
         if(me.getX()==lastX&&me.getY()==lastY) stuckTicks++; else stuckTicks=0;
         lastX=me.getX();lastY=me.getY();
 
-        // 重规划: 无路径/走完/卡住
-        boolean needReplan=path.isEmpty()||pathIdx>=path.size()||stuckTicks>60;
+        // ★差异1(PC官方): base_source位置/plane变化即重规划 —— Navigator.step 内部每步 _plan_again。
+        //   端上等价实现: 位置/plane 变化 或 无路径/走完 或 卡住(阈值收紧到20) -> 立即 astar 重规划。
+        //   这样每走一步都重新生成路径、重新判断障碍, 与 PC "走一步→官方判→自动重规划"闭环一致。
+        boolean posChanged=(me.getX()!=lastPlanX||me.getY()!=lastPlanY||me.getPlane()!=lastPlanP);
+        boolean needReplan=path.isEmpty()||pathIdx>=path.size()||posChanged||stuckTicks>20;
         if(needReplan){
             List<Pt> p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
             // ★屏蔽已改为 A* 软惩罚(cost+50), 恒有路; 不再清空屏蔽重算(那是震荡根因)。
@@ -4304,6 +4319,7 @@ public final class NavBot implements Plugin {
                 stuckTicks=0; return;
             }
             path=p;pathIdx=0;stuckTicks=0;lastWalkTick=-1;
+            lastPlanX=me.getX();lastPlanY=me.getY();lastPlanP=me.getPlane();
             StringBuilder pb=new StringBuilder("[实时导航] 规划 "+p.size()+"步 "+me.getX()+","+me.getY()+",p"+me.getPlane()+" -> "+goalName+" 路径=");
             for(int pi=0;pi<p.size()&&pi<8;pi++){Pt pp=p.get(pi);pb.append(pp.x).append(",").append(pp.y).append("p").append(pp.p).append(" ");}
             ctx.log(pb.toString());
@@ -4356,11 +4372,21 @@ public final class NavBot implements Plugin {
         }
         interactTries=0;
 
-        // 逐格走: 到达当前目标(容差1)则推进; 未到则发walk(间隔30tick=600ms,避免flood)
-        int d=Math.max(Math.abs(target.x-me.getX()),Math.abs(target.y-me.getY()));
-        if(d<=1){pathIdx++;lastWalkTick=-1;return;}
-        if(lastWalkTick<0||t-lastWalkTick>=30){
-            client.walkTo(target.x,target.y);lastWalkTick=t;
+        // ★差异3(PC官方大步走): 同层无障碍时走"地图内最远点"大步, 位置跳变后差异1自动重规划。
+        //   bigStepGoal 返回 null(障碍贴身/路径点不足) 时回退逐格走。walk 间隔15tick=300ms(PC每50ms step,
+        //   端上受 GameTick 600ms 驱动+防flood, 取15tick折中), 避免同格重复发包。
+        int[] bg=bigStepGoal(me);
+        int gxx=(bg!=null)?bg[0]:target.x, gyy=(bg!=null)?bg[1]:target.y;
+        int d=Math.max(Math.abs(gxx-me.getX()),Math.abs(gyy-me.getY()));
+        if(d<=1){
+            if(bg==null){pathIdx++;lastWalkTick=-1;} // 逐格回退才推进pathIdx
+            return;
+        }
+        if(lastWalkTick<0||t-lastWalkTick>=15){
+            client.walkTo(gxx,gyy);lastWalkTick=t;
+            if(bg!=null&&t-lastLogTick>=50){lastLogTick=t;
+                ctx.log("[实时导航] →大步 ("+gxx+","+gyy+") 当前"+me.getX()+","+me.getY()
+                        +" 距"+d+"格(逐格目标"+target.x+","+target.y+")");}
         }
     }
 
@@ -4369,6 +4395,12 @@ public final class NavBot implements Plugin {
     private boolean isPassAct(String a){ for(String p:PASS_ACTS) if(a.equals(p)) return true; return false; }
     private boolean isStairName(String n){ return n.contains("stair")||n.contains("ladder")||
         n.contains("trapdoor")||n.contains("hatch"); }
+    /** ★PC官方 DISPLACE_ACTS: 位移型障碍(climb-over/cross/squeeze/jump/enter/climb),
+     *   invoke 本身把角色送过障碍, 绝不能走门的 walk-through 落脚点(会位移后又走回原地卡死)。 */
+    private boolean isDisplaceAct(java.util.List<String> acts){
+        for(String a:acts) for(String d:DISPLACE_ACTS) if(a.equals(d)) return true;
+        return false;
+    }
 
     /** ★现场扫描障碍object: 1:1 用 PC Ghost 的 GhostRuntime.api().objects() (id/name/x/y/plane/actions)。
      *  该 API 端上经 AndroidOSRS.objectList() -> ObjectDefs.get(oid) 查真实 name+actions, 关门=11773[Open]/开门=11774[Close],
@@ -4706,10 +4738,18 @@ public final class NavBot implements Plugin {
                 ranked.add(new int[]{oi,0,d,d*100 + (isOpenState?0:1)});
             }
         }
-        // 4) 假门证伪: 有障碍格但无object候选 -> 计3次直接走过
+        // 4) 假门证伪(PC fake_door): 有障碍格但无object候选 -> 空点累计达阈值强制走过。
+        //   ★PC阈值自适应: 障碍格附近若连一个门/Gate都没有(官方误报)阈值=2, 否则=4。
         if(ranked.isEmpty()){
             // ★一次性诊断: 打印 scene base / 本地玩家 base / 目标格单格原始返回
             String fk=tx+","+ty+","+mp;
+            boolean hasDoorNear=false;
+            for(ObsObj o:obs){
+                boolean dn=o.name.contains("door")||o.name.contains("gate");
+                boolean da=false; for(String a:o.acts)if(a.equals("open")||a.equals("close"))da=true;
+                if((dn||da)&&Math.abs(o.x-tx)+Math.abs(o.y-ty)<=3){hasDoorNear=true;break;}
+            }
+            int fakeTh=hasDoorNear?4:2;
             int n=fakeDoorN.containsKey(fk)?fakeDoorN.get(fk)+1:1; fakeDoorN.put(fk,n);
             if(n==1||n==5){
                 int[] _sb=com.astrastudio.runtime.internal.NativeBridge.nativeSceneBase();
@@ -4720,7 +4760,7 @@ public final class NavBot implements Plugin {
                         +" localBase="+java.util.Arrays.toString(_lb)
                         +" tileRaw="+java.util.Arrays.toString(_tr));
             }
-            if(n>=3){
+            if(n>=fakeTh){
                 // ★假门证伪: cost2 是 walkgraph 误标, 现场无真门 -> 直接朝障碍格本身走,
                 //   靠官方引擎走进去(若是假门则可通行)。绝不 walkTo(foot): foot 在障碍格
                 //   另一侧, 玩家够不到会永远卡住(实测 3202,3476 卡死)。持续尝试到位置变化。
@@ -4763,6 +4803,24 @@ public final class NavBot implements Plugin {
             // 也放行门自身坐标格(实测门object坐标可能与障碍格错开1格, 如11772@3219,3472 vs 障碍格3218,3472)
             openedTiles.put(best.x+","+best.y+","+mp,t);
             return false;
+        }
+        // ★★差异4(PC官方 DISPLACE_ACTS): 位移型障碍(invoke自身送角色翻越/钻缝/跳/进洞/攀爬)。
+        //   与门的本质区别: 门 open 后还要 walk-through 落脚点; 位移型 invoke 的瞬间角色已过障碍,
+        //   若再走 foot 会被送回原地卡死(PC ghost_navigator_live.py:557-568 明确禁止)。
+        //   处理: 只发一次官方桥 invoke, 记录 invoke 前位置, 交回 onTick —— 位置/plane 变化由
+        //   差异1(每步重规划)自动检测, 不写 crossGateTick(不走门落脚点), 不轮换 slot/物品。
+        boolean displace=isDisplaceAct(best.acts) && !best.stair;
+        if(displace){
+            int dslot=0;
+            for(String want:INVOKE_PRIORITY){int idx=best.acts.indexOf(want);if(idx>=0){dslot=idx;break;}}
+            if(lastDoorInvokeTick>=0&&t-lastDoorInvokeTick<40)return true;
+            lastDoorInvokeTick=t;
+            dispX=mx;dispY=my;dispP=mp;dispTick=t;
+            ctx.log("[opener] ★位移型障碍 id="+best.id+" '"+best.name+"' acts="+best.acts
+                    +" slot="+dslot+" -> 单次invoke, 靠位置变化交回重规划(不走foot)");
+            try{ com.ghost.api.shim.GhostRuntime.api().invokeObject(best.id,best.x,best.y,dslot); }
+            catch(Throwable e){ ctx.log("[opener] 位移invoke异常 "+e+" -> sendObj1"); sendObj1(best.id,best.x,best.y); }
+            return true;
         }
         // ★key用障碍格真坐标(tx,ty), 不用设备错报的best.x,best.y(否则防toggle失效)
         String key=best.id+"@"+tx+","+ty;
@@ -4841,11 +4899,25 @@ public final class NavBot implements Plugin {
             blockedTiles.add(key(tx,ty,mp));
             path.clear(); pathIdx=0; lastWalkTick=-1;
         }
-        // 7) 门振荡: 同门open>=5次且接近目标 -> 冲目标
-        if(n>=5&&Math.abs(mx-goalX)+Math.abs(my-goalY)<=8){
+        // 7) ★门振荡(PC door_osc 1:1): 记录同门最近位置集合; 判定"在门两侧几个点间来回、
+        //   没向目标推进"且接近目标 -> 冲最终目标(证伪这扇非必经门)。
+        java.util.Set<Long> poses=pcDoorOscPoses.get(key);
+        if(poses==null){poses=new java.util.HashSet<>();pcDoorOscPoses.put(key,poses);}
+        poses.add(key(mx,my,mp));
+        if(poses.size()>8)poses.clear();
+        boolean goalNear=Math.abs(mx-goalX)+Math.abs(my-goalY)<=8;
+        boolean oscillating=false;
+        if(n>=4&&poses.size()<=4){
+            oscillating=true;
+            for(long pk:poses){
+                int px=(int)((pk>>24)&0xffff), py=(int)((pk>>2)&0x3fffffff);
+                if(Math.abs(px-tx)+Math.abs(py-ty)>3){oscillating=false;break;}
+            }
+        }
+        if(oscillating&&goalNear&&n>=5){
             if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(goalX,goalY);lastWalkTick=t;}
-            ctx.log("[opener] ★门振荡 冲目标 ("+goalX+","+goalY+")");
-            doorOscN.remove(key);crossGateTick.remove(key);
+            ctx.log("[opener] ★门振荡(位置集合"+poses.size()+"点) 冲目标 ("+goalX+","+goalY+")");
+            doorOscN.remove(key);crossGateTick.remove(key);pcDoorOscPoses.remove(key);
         }
         return true;
     }
@@ -4870,6 +4942,51 @@ public final class NavBot implements Plugin {
         }
         if((fx==tx&&fy==ty)||(fx==mx&&fy==my)){fx=tx+sx;fy=ty+sy;}
         return new int[]{fx,fy};
+    }
+
+    /** ★差异3(PC官方 _big_step_goal 1:1, ghost_navigator_live.py:253-318):
+     *  扫描"地图内"(距玩家<=MAP_R=16格)的前方路径点。
+     *    - 前方地图内有障碍object -> 终点=障碍前一格(停下交给 opener 点, 绝不越过)。
+     *    - 无障碍 -> 取地图内距玩家最远 FAR_TOP=5 个路径点里随机选一个当大步终点。
+     *  位置跳变后由差异1(每步重规划)自动接续 —— 等价 PC Navigator 检测位置跳变后自动重规划。
+     *  返回 null 表示无可用大步点, 调用方回退逐格走。 */
+    private int[] bigStepGoal(WorldPoint me){
+        int mx=me.getX(),my=me.getY(),mp=me.getPlane();
+        java.util.List<int[]> ahead=new java.util.ArrayList<>();
+        for(int i=pathIdx;i<path.size();i++){
+            Pt q=path.get(i); if(q.p!=mp)break;
+            int ddx=q.x-mx,ddy=q.y-my;
+            if(ddx*ddx+ddy*ddy>MAP_R*MAP_R)break;
+            if(ddx==0&&ddy==0)continue;
+            ahead.add(new int[]{q.x,q.y});
+        }
+        if(ahead.size()<2)return null;
+        // 地图内障碍object集合(现场真值, scanObstacles 已按白名单过滤)
+        java.util.List<ObsObj> obs=scanObstacles(mx,my);
+        // 情形1: 前方路径点命中障碍 -> 停在障碍前一格
+        for(int a=0;a<ahead.size();a++){
+            int wx=ahead.get(a)[0],wy=ahead.get(a)[1];
+            boolean hit=false;
+            for(ObsObj o:obs){ if(Math.abs(wx-o.x)+Math.abs(wy-o.y)<=OBS_NEAR_PC){hit=true;break;} }
+            if(hit){
+                if(a<=0)return null;   // 障碍就在贴身, 交 opener 在 pathIdx 处理
+                int[] prev=ahead.get(a-1);
+                if(Math.abs(prev[0]-mx)+Math.abs(prev[1]-my)<=1)return null;
+                return prev;
+            }
+        }
+        // 情形2: 无障碍 -> 最远 FAR_TOP 个里随机选一个
+        java.util.List<int[]> far=new java.util.ArrayList<>(ahead);
+        java.util.Collections.sort(far,new java.util.Comparator<int[]>(){
+            public int compare(int[] a,int[] b){
+                long da=(long)(a[0]-mx)*(a[0]-mx)+(long)(a[1]-my)*(a[1]-my);
+                long db=(long)(b[0]-mx)*(b[0]-mx)+(long)(b[1]-my)*(b[1]-my);
+                return Long.compare(db,da);
+            }
+        });
+        int top=Math.min(FAR_TOP,far.size());
+        int chosen=new java.util.Random().nextInt(top);
+        return far.get(chosen);
     }
 
     /** object1(op88)通用发包: 门Open(slot0)。payload与sendStair opt1一致。 */
