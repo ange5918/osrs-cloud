@@ -950,10 +950,16 @@ public final class NavBot implements Plugin {
         //   玩家卡在同格 stuckTicks 持续上涨。卡住>=阈值时, 把路径前方第一格(ahead[1])当障碍格, 交给
         //   现场object验证+def真值门候选处理。这是 PC Ghost on_obstacle 的端上等价补充。
         boolean stuckForced=false;
-        if(stuckTicks>=12 && ahead.size()>=1){
-            // 取路径当前目标格(玩家正试图走入却走不动的格子)=真障碍格
-            tx=ahead.get(0)[0]; ty=ahead.get(0)[1]; stuckForced=true;
-            ctx.log("[opener] ★stuck="+stuckTicks+" 强制障碍格("+tx+","+ty+") p"+mp);
+        if(stuckTicks>=12){
+            // 取路径中第一个非脚格(玩家正试图走入却走不动的格子)=真障碍格。
+            // ahead[0]常是脚格本身, 从ahead[1]起找第一个不同于玩家坐标的点。
+            for(int ai=0;ai<ahead.size();ai++){
+                int qx=ahead.get(ai)[0],qy=ahead.get(ai)[1];
+                if(qx==mx&&qy==my)continue;
+                tx=qx;ty=qy;stuckForced=true;
+                ctx.log("[opener] ★stuck="+stuckTicks+" 强制障碍格("+tx+","+ty+") p"+mp+" ai="+ai);
+                break;
+            }
         }
         if(!stuckForced) costEdge:
         for(int i=0;i+1<ahead.size();i++){
@@ -1018,8 +1024,11 @@ public final class NavBot implements Plugin {
                 boolean isDoor=false;
                 for(String a:o.acts){ if(a.equals("open")||a.equals("close")){isDoor=true;break;} }
                 if(!isDoor)continue;
+                if(o.pl!=mp)continue;  // ★真plane已可用: 只取同层门, 排除p0/p2远处门
                 int actRank=0; for(String a:o.acts){ if(a.equals("open")){actRank=0;break;} }
-                ranked.add(new int[]{oi,0,0,actRank*10000});
+                // ★native真坐标已可用: 按离障碍格距离排序, 选面前最近的门(而非第一个)
+                int d=Math.abs(o.x-tx)+Math.abs(o.y-ty);
+                ranked.add(new int[]{oi,0,d,actRank*10000 + d*100});
             }
         }
         // 4) 假门证伪: 有障碍格但无object候选 -> 计3次直接走过
@@ -1067,10 +1076,13 @@ public final class NavBot implements Plugin {
         }
         if(lastDoorInvokeTick>=0&&t-lastDoorInvokeTick<40)return true;
         lastDoorInvokeTick=t;
-        // 6) ★PC Ghost 同款交互: GhostRuntime.api().invokeObject(id,x,y,slot), slot=actions.indexOf(INVOKE_PRIORITY)。
-        //   invokeObject -> AndroidOSRS.call("invoke_object") -> client.interactObjectSlot(oid,x,y,slot) -> native 引擎正常 seq。
-        //   坐标用障碍格真坐标(tx,ty): 端上 object 锚点偶有1格错位, 已验证门11773真值(3219,3472)=障碍格。
+        // 6) ★PC Ghost 同款交互: invokeObject(id,x,y,slot), slot=actions.indexOf(INVOKE_PRIORITY)。
+        //   ★坐标对齐 PC Ghost: 用 object 自身真坐标 (best.x,best.y) —— native 已修复真坐标+真plane,
+        //   这是官方 TileObject.getWorldLocation() 等价真值。障碍格(tx,ty)仅作object坐标离谱时的兜底。
         //   只发一次, 不叠加另一个发包(否则同tick两个op88 toggle两次=没开), 这是PC Ghost防toggle核心。
+        int ix=best.x, iy=best.y;
+        // 若object离障碍格>3(坐标异常)才退回障碍格
+        if(Math.abs(ix-tx)+Math.abs(iy-ty)>3){ ix=tx; iy=ty; }
         int slot=0; boolean found=false;
         for(String want:INVOKE_PRIORITY){
             int idx=best.acts.indexOf(want);
@@ -1078,15 +1090,15 @@ public final class NavBot implements Plugin {
         }
         if(!found) for(int i=0;i<best.acts.size();i++) if(isPassAct(best.acts.get(i))){slot=i;break;}
         try{
-            com.ghost.api.shim.GhostRuntime.api().invokeObject(best.id,tx,ty,slot);
+            com.ghost.api.shim.GhostRuntime.api().invokeObject(best.id,ix,iy,slot);
         }catch(Throwable e){
             ctx.log("[opener] invoke异常 "+e+" -> 回退 sendObj1");
-            sendObj1(best.id,tx,ty);
+            sendObj1(best.id,ix,iy);
         }
         if(!best.stair){crossGateTick.put(key,nowMs);crossGateFoot.put(key,foot);}
         int n=doorOscN.containsKey(key)?doorOscN.get(key)+1:1; doorOscN.put(key,n);
         ctx.log("[opener] ★invoke id="+best.id+" '"+best.name+"' slot="+slot+" acts="+best.acts+
-            " 发包坐标("+tx+","+ty+") 落脚("+foot[0]+","+foot[1]+") n="+n);
+            " 发包坐标("+ix+","+iy+") 障碍格("+tx+","+ty+") 落脚("+foot[0]+","+foot[1]+") n="+n);
         // 7) 门振荡: 同门open>=5次且接近目标 -> 冲目标
         if(n>=5&&Math.abs(mx-goalX)+Math.abs(my-goalY)<=8){
             if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(goalX,goalY);lastWalkTick=t;}
