@@ -834,10 +834,13 @@ public final class NavBot implements Plugin {
             Edge ed=findEdge(prev.x,prev.y,prev.p,target.x,target.y,target.p);
             int oid=(ed!=null)?ed.oid:guessOid(prev.p,target.p);
             int sx=prev.x, sy=prev.y;   // PC Ghost 默认坐标=prev格
-            // ②现场 objects() 真值覆盖 oid+坐标 (v242 findLiveStair, 旧edge/guess的1667x已失效)
+            // ②坐标优先用跨层边自带的权威交互格(ed.sx,ed.sy), 不用现场object坐标。
+            //   端上 native object 坐标有~2格残差(梯报3224,3470; 边起点3223,3472), 用现场坐标会走错位。
+            if(ed!=null){sx=ed.sx;sy=ed.sy;}
+            // ③现场 objects() 只用来验证/覆盖 oid (确认该楼梯当前真在现场), 不改坐标。
             int[] live=findLiveStair(prev.x,prev.y,target.x,target.y);
             boolean liveHit=(live!=null);
-            if(liveHit){oid=live[0];sx=live[1];sy=live[2];}
+            if(liveHit){oid=live[0]; if(ed==null){sx=live[1];sy=live[2];}}
             ctx.log("[实时导航] ↑楼梯 oid链="+(ed!=null?"ed.oid="+ed.oid:"guessOid="+guessOid(prev.p,target.p))+
                 " 现场="+(liveHit?"id="+live[0]+"@"+live[1]+","+live[2]:"miss")+" 采用="+oid+"@"+sx+","+sy);
             // ★交互距离用曼哈顿(PC Ghost: 必须走到物体相邻格才能交互)。
