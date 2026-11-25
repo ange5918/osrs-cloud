@@ -4383,10 +4383,13 @@ public final class NavBot implements Plugin {
             ctx.log("[实时导航] ↑楼梯 oid链="+(ed!=null?"ed.oid="+ed.oid:"guessOid="+guessOid(prev.p,target.p))+
                 " 现场="+(liveHit?"id="+live[0]+"@"+live[1]+","+live[2]:"miss")+
                 " oid同层="+(byOid!=null?byOid[0]+","+byOid[1]:"miss")+" 采用="+oid+"@"+sx+","+sy);
-            // ★交互距离用曼哈顿(PC Ghost: 必须走到物体相邻格才能交互)。
-            //   max距离会把斜对角(max=2)误判为"够近"而狂发包, 实际楼梯在斜对角op88不生效。
+            // ★交互距离: 发包坐标是楼梯 object 锚点(sx,sy), 但 object 有多格尺寸(如16672是2x2)。
+            //   玩家站在 object 覆盖格边上(锚点曼哈顿3)也能交互, 阈值用4(锚点+size);
+            //   太小(<=2)会把站在2x2楼梯旁的玩家判成"太远"走进walkTo却走不动(实测卡死)。
+            //   现场object坐标(byOid)命中时放宽到4; 回退ed/guess坐标时保持严格2(避免点空)。
             int sd=Math.abs(sx-me.getX())+Math.abs(sy-me.getY());
-            if(sd>2){
+            int reach=liveUsed?4:2;
+            if(sd>reach){
                 if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(sx,sy);lastWalkTick=t;}
                 if(lastLogTick<0||t-lastLogTick>=50){lastLogTick=t;
                     ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 梯距"+sd);}
