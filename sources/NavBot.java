@@ -840,10 +840,13 @@ public final class NavBot implements Plugin {
             if(liveHit){oid=live[0];sx=live[1];sy=live[2];}
             ctx.log("[实时导航] ↑楼梯 oid链="+(ed!=null?"ed.oid="+ed.oid:"guessOid="+guessOid(prev.p,target.p))+
                 " 现场="+(liveHit?"id="+live[0]+"@"+live[1]+","+live[2]:"miss")+" 采用="+oid+"@"+sx+","+sy);
-            int sd=Math.max(Math.abs(sx-me.getX()),Math.abs(sy-me.getY()));
-            if(sd>3){
-                if(lastWalkTick<0||t-lastWalkTick>=30){client.walkTo(sx,sy);lastWalkTick=t;}
-                ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 距"+sd);
+            // ★交互距离用曼哈顿(PC Ghost: 必须走到物体相邻格才能交互)。
+            //   max距离会把斜对角(max=2)误判为"够近"而狂发包, 实际楼梯在斜对角op88不生效。
+            int sd=Math.abs(sx-me.getX())+Math.abs(sy-me.getY());
+            if(sd>2){
+                if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(sx,sy);lastWalkTick=t;}
+                if(lastLogTick<0||t-lastLogTick>=50){lastLogTick=t;
+                    ctx.log("[实时导航] →靠近楼梯 ("+sx+","+sy+") 当前"+me.getX()+","+me.getY()+" 曼哈顿距"+sd);}
                 return;
             }
             if(lastInteractTick<0||t-lastInteractTick>=40){
