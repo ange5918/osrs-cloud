@@ -4695,25 +4695,61 @@ public final class NavBot implements Plugin {
         //   y残差改用障碍格(tx,ty), 但真值链修复后 objects() 坐标已是真值:
         //   真门 door@(3202,3475), 障碍格(3203,3475) —— 用障碍格发包差一格, 点空, 门不开。
         //   改用 best.x,best.y; 仅在物体坐标为0(异常)时回退障碍格。
-        int ix=(best.x!=0?best.x:tx), iy=(best.y!=0?best.y:ty);
-        ctx.log("[opener] ★发包坐标源 bestXY="+best.x+","+best.y+" pl="+best.pl
-                +" 障碍格="+tx+","+ty+" -> 用("+ix+","+iy+")");
+        // ★PC 还有 4 类交互手段(协议直发/客户端内部函数/屏幕点击/物品作用), 端上目前只通了
+        //   协议直发的 object1。这里按 PC 的"现场验证 + 多方法兜底"补两条低成本路径:
+        //     (1) 坐标轮换: 门锚点坐标报 p1 而玩家在 p2 时 op88 会被服务器按玩家层解释而点空。
+        //         第1次用门锚点(best.x,best.y), 第2次改用障碍格(tx,ty), 第3次用玩家相邻格。
+        //     (2) 钥匙兜底: 反复 open 无效 -> 用背包物品作用在门上(PC use_item_on_object/op29)。
+        //   绝不同一 tick 叠加两个 op88(会 toggle 两次抵消), 每次只走一条, 靠 doorOscN 递进。
+        int n=doorOscN.containsKey(key)?doorOscN.get(key)+1:1;
+        int[] chosen=doorInvokeCoord(best,tx,ty,mx,my,n);
+        int ix=chosen[0], iy=chosen[1];
+        ctx.log("[opener] ★发包坐标源 mode="+chosen[2]+" bestXY="+best.x+","+best.y+" pl="+best.pl
+                +" 障碍格="+tx+","+ty+" me="+mx+","+my+" n="+n+" -> 用("+ix+","+iy+")");
         int slot=0; boolean found=false;
         for(String want:INVOKE_PRIORITY){
             int idx=best.acts.indexOf(want);
             if(idx>=0){slot=idx;found=true;break;}
         }
         if(!found) for(int i=0;i<best.acts.size();i++) if(isPassAct(best.acts.get(i))){slot=i;break;}
-        try{
-            com.ghost.api.shim.GhostRuntime.api().invokeObject(best.id,ix,iy,slot);
-        }catch(Throwable e){
-            ctx.log("[opener] invoke异常 "+e+" -> 回退 sendObj1");
-            sendObj1(best.id,ix,iy);
+        // ★A/B/D 三级兜底链(每 tick 只发一条, 绝不叠加, 防 toggle 抵消):
+        //   n=1..2  路径A: 官方桥 invokeObject(best.id,x,y,slot=actions.indexOf(open)), 坐标轮换门锚点/障碍格
+        //   n=3..5  路径B: 官方桥 invokeObject, 轮换 slot(0,1,2,3) -> 客户端按 object2..5 组包, 自带真 plane
+        //   n>=6    路径D: 背包物品作用在门(PC use_item_on_object/op29), 覆盖钥匙门
+        String pathTag;
+        if(n<=2){
+            pathTag="A/协议";
+            try{ com.ghost.api.shim.GhostRuntime.api().invokeObject(best.id,ix,iy,slot); }
+            catch(Throwable e){ ctx.log("[opener] invoke异常 "+e+" -> 回退 sendObj1"); sendObj1(best.id,ix,iy); }
+        }else if(n<=5){
+            // B: slot 轮换(PC OBJECT_OPCODES object1..5)。actions 若 def 读错位, 真 Open 可能在 slot1/2/3
+            int bs=n-2; // n=3->1, n=4->2, n=5->3
+            int useSlot=bs<best.acts.size()?bs:slot;
+            pathTag="B/slot轮换"+bs;
+            try{ com.ghost.api.shim.GhostRuntime.api().invokeObject(best.id,ix,iy,useSlot); }
+            catch(Throwable e){ ctx.log("[opener] B invoke异常 "+e+" -> sendObj1"); sendObj1(best.id,ix,iy); }
+            slot=useSlot;
+        }else{
+            // D: 背包物品作用在门(PC use_item_on_object), 优先钥匙类
+            pathTag="D/物品";
+            boolean itemSent=tryItemOnDoor(best.id,ix,iy,ctx,n);
+            if(!itemSent){
+                // 无钥匙兜底 -> 回到官方桥用门锚点重发一次
+                try{ com.ghost.api.shim.GhostRuntime.api().invokeObject(best.id,best.x,best.y,slot); }
+                catch(Throwable e){ sendObj1(best.id,best.x,best.y); }
+            }
+            ctx.log("[opener] ★D物品 sent="+itemSent);
         }
-        if(!best.stair){crossGateTick.put(key,nowMs);crossGateFoot.put(key,foot);}
-        int n=doorOscN.containsKey(key)?doorOscN.get(key)+1:1; doorOscN.put(key,n);
-        ctx.log("[opener] ★invoke id="+best.id+" '"+best.name+"' slot="+slot+" acts="+best.acts+
+        ctx.log("[opener] ★invoke["+pathTag+"] id="+best.id+" '"+best.name+"' slot="+slot+" acts="+best.acts+
             " 发包坐标("+ix+","+iy+") 障碍格("+tx+","+ty+") 落脚("+foot[0]+","+foot[1]+") n="+n);
+        if(!best.stair){crossGateTick.put(key,nowMs);crossGateFoot.put(key,foot);}
+        doorOscN.put(key,n);
+        // PC 防死循环: A(2)+B(3)+D(1) 全无效(>=9次) -> 判定假门, 屏蔽并绕路
+        if(n>=9&&Math.abs(mx-goalX)+Math.abs(my-goalY)>8){
+            ctx.log("[opener] ★A/B/D 全无效 n="+n+" -> 屏蔽障碍格并绕路");
+            blockedTiles.add(key(tx,ty,mp));
+            path.clear(); pathIdx=0; lastWalkTick=-1;
+        }
         // 7) 门振荡: 同门open>=5次且接近目标 -> 冲目标
         if(n>=5&&Math.abs(mx-goalX)+Math.abs(my-goalY)<=8){
             if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(goalX,goalY);lastWalkTick=t;}
@@ -4752,6 +4788,52 @@ public final class NavBot implements Plugin {
         int xX=(X&0xff)^0x80,hiX=(X>>8)&0xff,hiY=(Y>>8)&0xff,loY=Y&0xff;
         client.sendPacket(88,new byte[]{(byte)xX,(byte)hiX,(byte)hiY,(byte)loY,0,
             (byte)lo,(byte)hi,(byte)b2,0});
+    }
+
+    /** ★路径A坐标轮换(n=1,2): n1用门自身锚点(best.x,best.y,官方TileObject真值),
+     *  n2用路径障碍格(tx,ty)。返回 {ix,iy,mode}。门报p1玩家p2时轮换第二格避免按玩家层点空。 */
+    private int[] doorInvokeCoord(ObsObj b,int tx,int ty,int mx,int my,int n){
+        int ix=b.x,iy=b.y,mode=1;
+        if(n==2){ ix=tx; iy=ty; mode=2; }
+        // 坐标为0(异常)时兜底到障碍格
+        if(ix==0&&iy==0){ix=tx;iy=ty;mode=3;}
+        return new int[]{ix,iy,mode};
+    }
+
+    /** ★路径D: 背包物品作用在门(PC use_item_on_object/op29)。优先钥匙类物品(id在KEY_IDS),
+     *  否则用 n 轮转背包槽逐个试。返回是否成功发出一条 useItemOnObject 包。
+     *  走 client.useItemOnObject -> ClientExt -> NativeBridge.nativeUseItemOnObject (链已验证)。 */
+    private boolean tryItemOnDoor(int oid,int x,int y,PluginContext ctx,int n){
+        try{
+            java.util.List<com.astrastudio.api.model.GroundItem> inv=client.getInventory();
+            if(inv==null||inv.isEmpty())return false;
+            // 优先钥匙类: KEY_IDS 命中
+            com.astrastudio.api.model.GroundItem pick=null;
+            for(com.astrastudio.api.model.GroundItem it:inv){
+                if(it==null)continue;
+                if(isKeyItem(it.getItemId())){pick=it;break;}
+            }
+            // 无钥匙: 按 n 轮转背包槽(每次只试一件, 避免同tick多包)
+            if(pick==null){
+                int k=(n-6)%inv.size(); if(k<0)k+=inv.size();
+                pick=inv.get(k);
+            }
+            if(pick==null)return false;
+            boolean ok=client.useItemOnObject(pick.getLocalX(),pick.getItemId(),oid,x,y);
+            ctx.log("[opener] D物品作用 item="+pick.getItemId()+" slot="+pick.getLocalX()+" qty="+pick.getQuantity()
+                +" on oid="+oid+" @"+x+","+y+" -> "+ok);
+            return ok;
+        }catch(Throwable e){ctx.log("[opener] D物品异常 "+e);return false;}
+    }
+
+    /** 常见钥匙/锁匙类物品 id(PC KEYS)。命中即优先用于门。 */
+    private boolean isKeyItem(int id){
+        // OSRS 常见钥匙: 钢钥匙(Crystal key 925 等泛用), 这里用可配置表, 空表时不误判
+        int[] KEYS={925,926,927,928,929,930,931,932,1596,1597,2055,2064,2067,2068,2969,2970,2971,
+            3152,3176,3296,3297,3300,3301,3473,3877,5511,5557,5887,5899,6809,6891,6901,7137,
+            7239,7240,7241,7242,7243,7244,7245,7246,7247,7248,7249,7967,7968,7969,7970,7971};
+        for(int k:KEYS) if(id==k)return true;
+        return false;
     }
 
     private Edge findEdge(int sx,int sy,int sp,int dx,int dy,int dp){
