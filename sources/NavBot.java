@@ -4553,7 +4553,12 @@ public final class NavBot implements Plugin {
         java.util.List<int[]> ranked=new java.util.ArrayList<>();  // {obsIdx, dPath, dTarget, score}
         for(int oi=0;oi<obs.size();oi++){
             ObsObj o=obs.get(oi);
-            if(o.pl!=mp)continue;   // 同层硬门槛(PC Ghost同款)
+            // ★按 PC Ghost: opener 不按"门自己 plane==玩家 plane"硬过滤。
+            //   PC 的 objects.near(mp,...)  admissible 靠"到障碍格/路径的距离", 门报 p1 但玩家在 p2
+            //   照样 invoke(实证 before p2 点 Door@3203,3476)。端上旧 `o.pl!=mp` 把真门
+            //   door@3202,3475,p1 排除 -> 双约束无候选 -> 假门证伪空发 n=200。
+            //   改为只排除相差>1层的远处物体(如玩家p2时的p0门), 保留相邻层真门。
+            if(Math.abs(o.pl-mp)>1)continue;
             int actRank=2;
             for(String a:o.acts){
                 if(a.equals("open")||a.equals("close")||a.equals("cross")||a.equals("enter")
@@ -4567,7 +4572,10 @@ public final class NavBot implements Plugin {
                 continue;
             }
             int dTarget=Math.abs(o.x-tx)+Math.abs(o.y-ty);
-            if(dTarget>0)continue;  // 端上 objects() 坐标错报: 严格重合, 不认邻格假门
+            // ★按 PC Ghost DOOR_NEAR=1: 门交互点常与障碍格错开1格(门锚点在邻格),
+            //   严格 dTarget==0 会把 door@3202,3475(障碍格3203,3475) 排除。放宽到<=1,
+            //   同时用 score 的 onTile 项让"正好在障碍格"的门优先, 避免邻格假门被误选。
+            if(dTarget>OBS_NEAR)continue;
             int dPath=OBS_NEAR+1;
             for(int[] q:ahead){
                 int dd=Math.abs(o.x-q[0])+Math.abs(o.y-q[1]);
@@ -4592,11 +4600,13 @@ public final class NavBot implements Plugin {
                 boolean isDoor=false;
                 for(String a:o.acts){ if(a.equals("open")||a.equals("close")){isDoor=true;break;} }
                 if(!isDoor)continue;
-                if(o.pl!=mp)continue;  // ★真plane已可用: 只取同层门, 排除p0/p2远处门
+                // ★按 PC: 门 plane 与玩家不同层也可能挡路(door@3202,p1 vs 玩家p2), 只排除>1层
+                if(Math.abs(o.pl-mp)>1)continue;
                 // ★坐标残差兜底: 只接受"当前玩家附近"的门。实测 object 世界坐标会在跨区块时
                 //   出现 ±8 抖动, 不限制距离会选到远处同 id 门并反复 toggle 错误格。
                 if(Math.abs(o.x-mx)+Math.abs(o.y-my)>3)continue;
-                if(Math.abs(o.x-tx)+Math.abs(o.y-ty)>0)continue;
+                // ★PC DOOR_NEAR=1: 门锚点常在障碍格邻格, 放宽到<=1 (旧 >0 把真门排除)
+                if(Math.abs(o.x-tx)+Math.abs(o.y-ty)>OBS_NEAR)continue;
                 // ★actions 真值判门开关(PG同款): [Close]=门已开可通行 -> 最高优先级(触发直接走过);
                 //   [Open]=门关需开 -> 次优先。避免选到远处静态缓存的11773[open]反复开门。
                 boolean isOpenState=false;
