@@ -930,7 +930,7 @@ public final class NavBot implements Plugin {
                 //   箱子格反复开(实测 closed chest n=5 来回震荡)。opener 只管门/闸/栅栏类。
                 if(nm.contains("chest")||nm.contains("drawer")||nm.contains("cupboard")
                    ||nm.contains("cabinet")||nm.contains("bank")||nm.contains("manhole")
-                   ||nm.contains("bush")||nm.contains("search"))continue;
+                   ||nm.contains("bush")||nm.contains("search")||nm.contains("entrance"))continue;
                 // ★楼梯/梯子不进opener候选: 跨层交互由专门的跨层分支处理, opener只管门/闸等挡路障碍。
                 //   否则 opener 会把 staircase(climb-up) 当障碍狂点(实测 n=20) 且卡住玩家。
                 boolean isStair=isStairName(nm);
@@ -1041,6 +1041,10 @@ public final class NavBot implements Plugin {
                 for(String a:o.acts){ if(a.equals("open")||a.equals("close")){isDoor=true;break;} }
                 if(!isDoor)continue;
                 if(o.pl!=mp)continue;  // ★真plane已可用: 只取同层门, 排除p0/p2远处门
+                // ★坐标残差兜底: 只接受"当前玩家附近"的门。实测 object 世界坐标会在跨区块时
+                //   出现 ±8 抖动, 不限制距离会选到远处同 id 门并反复 toggle 错误格。
+                if(Math.abs(o.x-mx)+Math.abs(o.y-my)>3)continue;
+                if(Math.abs(o.x-tx)+Math.abs(o.y-ty)>3)continue;
                 // ★actions 真值判门开关(PG同款): [Close]=门已开可通行 -> 最高优先级(触发直接走过);
                 //   [Open]=门关需开 -> 次优先。避免选到远处静态缓存的11773[open]反复开门。
                 boolean isOpenState=false;
