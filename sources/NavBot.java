@@ -4416,6 +4416,22 @@ public final class NavBot implements Plugin {
     private java.util.List<ObsObj> readTileObstacles(int wx,int wy,int p){
         java.util.List<ObsObj> out=new java.util.ArrayList<>();
         try{
+            // ★PC同款: 先把该格每个 slot 的 ObjectDefinition* 直读出内存真 name (按 id 建表)。
+            //   静态 objects.json 缺段(如 23828/3096)时, 这里能从客户端内存拿到真名。
+            java.util.Map<Integer,String> memName=new java.util.HashMap<>();
+            try{
+                int[] dp=com.astrastudio.runtime.internal.NativeBridge.nativeTileObjectDefPtrs(wx,wy,p);
+                if(dp!=null) for(int j=0;j+3<dp.length;j+=4){
+                    int did=dp[j+3];
+                    if(did<=0)continue;
+                    String s=com.astrastudio.runtime.internal.NativeBridge.nativeReadDefName(dp[j+1],dp[j+2]);
+                    if(s!=null){
+                        int bar=s.indexOf('|');
+                        String mn=(bar>0?s.substring(bar+1):s).toLowerCase();
+                        if(!mn.isEmpty())memName.put(did,mn);
+                    }
+                }
+            }catch(Throwable ignore){}
             int[] raw=com.astrastudio.runtime.internal.NativeBridge.nativeTileObjects(wx,wy,p);
             if(raw==null||raw.length<3)return out;
             for(int i=0;i+2<raw.length;i+=3){
@@ -4423,6 +4439,9 @@ public final class NavBot implements Plugin {
                 if(id<=0)continue;
                 String[] def=com.astrastudio.runtime.internal.ObjectDefs.get(id);
                 String nm=(def!=null&&def[0]!=null)?def[0].toLowerCase():"";
+                // ★静态表缺段时, 用 PC 同款内存 def 直读的真名补上 (name 真值优先内存)。
+                String mem=memName.get(id);
+                if(mem!=null&&!mem.isEmpty())nm=mem;
                 java.util.List<String> acts=new java.util.ArrayList<>();
                 if(def!=null&&def[1]!=null){
                     for(String a:def[1].split(",")) if(!a.trim().isEmpty()) acts.add(a.trim().toLowerCase());
@@ -4448,7 +4467,7 @@ public final class NavBot implements Plugin {
                 for(String a:acts) if(isPassAct(a)){passable=true;break;}
                 boolean hit=isObsName(nm)||passable;
                 ctx.log("[opener] ★tile真值 kind="+kind+" id="+id+" shape="+shape+" name='"+nm
-                        +"' acts="+acts+" hit="+hit+" @("+wx+","+wy+",p"+p+")");
+                        +(mem!=null?"(内存def)":"(静态表)")+"' acts="+acts+" hit="+hit+" @("+wx+","+wy+",p"+p+")");
                 if(!hit||!passable)continue;
                 if(nm.contains("chest")||nm.contains("drawer")||nm.contains("cupboard")
                    ||nm.contains("cabinet")||nm.contains("bank")||nm.contains("bush"))continue;
