@@ -4741,6 +4741,10 @@ public final class NavBot implements Plugin {
             if(o.truthTile){
                 int dT=Math.abs(o.x-tx)+Math.abs(o.y-ty);
                 int dMe=Math.abs(o.x-mx)+Math.abs(o.y-my);
+                // ★PC官方 _door_ahead 前视 DOOR_LOOKAHEAD=16 但 invoke 只作用于"穿越中的门":
+                //   门必须贴着障碍格(dT<=OBS_NEAR+1)。实测门12348@3207,3217距障碍格3206,3214
+                //   有4格、距3207,3209有8格, 负分排最前被反复点(acts=[open]永不开) -> 距离硬过滤。
+                if(dT>OBS_NEAR+1)continue;
                 ranked.add(new int[]{oi,0,dT, -100000 + dT*100 + dMe}); // 负分=永远排最前
                 continue;
             }
