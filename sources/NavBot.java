@@ -4357,6 +4357,7 @@ public final class NavBot implements Plugin {
 
         // 跨层 -> 楼梯交互 (★完全对齐 PC Ghost: oid=ed.oid→guessOid→findLiveStair现场覆盖, 坐标=现场object)
         if(target.p!=me.getPlane()){
+            dumpLiveStairsOnce(); // 诊断: 现场所有Staircase的id/坐标/actions(仅首次)
             Pt prev=pathIdx>0?path.get(pathIdx-1):new Pt(me.getX(),me.getY(),me.getPlane());
             boolean up=target.p>me.getPlane();
             // ①PC Ghost链: 先取跨层边自带oid, 没有边就guessOid分层兜底
@@ -5076,6 +5077,29 @@ public final class NavBot implements Plugin {
     private Edge findEdge(int sx,int sy,int sp,int dx,int dy,int dp){
         List<Edge> es=edgeIdx.get(key(sx,sy,sp)); if(es==null)return null;
         for(Edge e:es) if(e.dx==dx&&e.dy==dy&&e.dp==dp)return e; return null;
+    }
+    private boolean stairsDumped=false;
+    /** 诊断: 现场所有 Staircase object 的 id/坐标/actions, 跨层时首次打印一次。 */
+    private void dumpLiveStairsOnce(){
+        if(stairsDumped)return;
+        stairsDumped=true;
+        try{
+            java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
+            if(all==null){ctx.log("[楼梯诊断] objects()=null");return;}
+            int n=0;
+            for(java.util.Map<String,Object> m:all){
+                if(m==null)continue;
+                String nm=String.valueOf(m.getOrDefault("name","")).toLowerCase();
+                if(!nm.contains("stair")&&!nm.contains("ladder"))continue;
+                int id=m.get("id") instanceof Number?((Number)m.get("id")).intValue():0;
+                int x=m.get("x") instanceof Number?((Number)m.get("x")).intValue():0;
+                int y=m.get("y") instanceof Number?((Number)m.get("y")).intValue():0;
+                int pl=m.get("plane") instanceof Number?((Number)m.get("plane")).intValue():0;
+                ctx.log("[楼梯诊断] id="+id+" '"+nm+"' @"+x+","+y+",p"+pl+" acts="+m.get("actions"));
+                if(++n>=25)break;
+            }
+            ctx.log("[楼梯诊断] 共"+n+"个楼梯object");
+        }catch(Throwable e){ctx.log("[楼梯诊断] ERR "+e);}
     }
     /** ★PC Ghost findLiveStair 1:1: 现场 GhostRuntime.api().objects() 读楼梯真 id+坐标。
      *  匹配 prev/target 附近3格内、name/actions 含 stair/climb/ladder/trapdoor/hatch 的 object。
