@@ -4864,9 +4864,13 @@ public final class NavBot implements Plugin {
         // ★key用障碍格真坐标(tx,ty), 不用设备错报的best.x,best.y(否则防toggle失效)
         String key=best.id+"@"+tx+","+ty;
         long nowMs=System.currentTimeMillis();
-        // 5) 门6s内开过 -> 不重复toggle, 直接走过
+        // 5) 门6s内开过 -> 不重复toggle, 直接走过。
+        //   ★但门若仍[open](关着)说明上次invoke没生效(acts没翻转)——此时不能套6s防toggle窗,
+        //   否则A/B/D轮换被拖成每级6秒、门迟迟点不开(实测large door 12349卡在3212,3221)。
+        //   门还关着时窗口缩短到800ms, 让A→B→D快速轮换; 真开了(含close)才用完整6s。
         Long last=crossGateTick.get(key);
-        if(last!=null&&(nowMs-last)<6000&&!best.stair){
+        long gateWindow=(bestOpen&&!bestClose)?800L:6000L;
+        if(last!=null&&(nowMs-last)<gateWindow&&!best.stair){
             int[] cf=crossGateFoot.get(key);
             int fx=cf!=null?cf[0]:foot[0],fy=cf!=null?cf[1]:foot[1];
             if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(fx,fy);lastWalkTick=t;}
