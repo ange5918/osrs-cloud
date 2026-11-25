@@ -911,18 +911,26 @@ public final class NavBot implements Plugin {
                 java.util.List<String> acts=new java.util.ArrayList<>();
                 Object raw=m.get("actions");
                 if(raw instanceof java.util.List) for(Object a:(java.util.List<?>)raw) if(a!=null) acts.add(String.valueOf(a).toLowerCase());
+                // ★权威真值覆盖 (绕开装机 APK 假动作 bug):
+                //   旧版 AndroidOSRS.objectList() 给每个 object 塞 [interact,open,climb-up,climb-down],
+                //   满场 object 都假 HIT。凡 DOOR_ACTS 表命中该 def id -> 用官方 actions 真值覆盖
+                //   (关门 11773=[Open] / 开门 11774=[Close]); 未命中但带假动作四件套 -> 清空, 不当障碍。
+                String defActs=doorActs(id);
+                boolean fakeActs=acts.contains("interact")&&acts.contains("open")
+                                 &&acts.contains("climb-up")&&acts.contains("climb-down");
+                if(!defActs.isEmpty()){
+                    acts.clear();
+                    for(String part:defActs.split(",")) acts.add(part.trim().toLowerCase());
+                }else if(fakeActs){
+                    acts.clear();
+                }
                 boolean hit=isObsName(nm);
                 for(String a:acts) if(isPassAct(a)){hit=true;break;}
                 if(dumpN<24 || hit){
-                    ctx.log("[opener诊断] "+(hit?"HIT ":"    ")+"id="+id+" name='"+nm+"' @("+x+","+y+",p"+pl+") acts="+acts);
+                    ctx.log("[opener诊断] "+(hit?"HIT ":"    ")+"id="+id+" name='"+nm+"' @("+x+","+y+",p"+pl+") acts="+acts+(defActs.isEmpty()?"":"(def真值)"));
                     dumpN++;
                 }
                 if(!hit)continue;
-                // ★双重兜底: objects() 若没带 actions(端上 def 表查不到) -> 用内嵌 DOOR_ACTS 表补齐真值
-                if(acts.isEmpty()){
-                    String defActs=doorActs(id);
-                    if(!defActs.isEmpty()) for(String part:defActs.split(",")) acts.add(part.trim().toLowerCase());
-                }
                 ObsObj oo=new ObsObj(); oo.id=id; oo.x=x; oo.y=y; oo.pl=pl;
                 oo.name=nm; oo.acts=acts; oo.stair=isStairName(nm);
                 for(String a:acts) if(a.startsWith("climb")){oo.stair=true;break;}
