@@ -1080,6 +1080,11 @@ public final class NavBot implements Plugin {
         java.util.Collections.sort(ranked,new java.util.Comparator<int[]>(){
             public int compare(int[] a,int[] b){return a[3]-b[3];}
         });
+        if(t-lastOpenerDiag>=40){
+            ObsObj db=obs.get(ranked.get(0)[0]);
+            ctx.log("[opener] 选best mp="+mp+" tx="+tx+","+ty+" ranked="+ranked.size()
+                    +" bestId="+db.id+" bestPl="+db.pl+" bestXY="+db.x+","+db.y);
+        }
         ObsObj best=obs.get(ranked.get(0)[0]);
         // ★官方 ObjectDef.actions 真值: Close 且无 Open = 门已开, 不是障碍, 直接走过(绝不发 op88)
         boolean bestOpen=false,bestClose=false;
