@@ -667,7 +667,12 @@ public final class NavBot implements Plugin {
     private final java.util.Map<String,Integer> fakeDoorN=new java.util.HashMap<>();
     private static final class ObsObj { int id,x,y,pl; String name; java.util.List<String> acts; boolean stair; }
 
-    public void configure(PluginContext c){ctx=c;client=c.getClient();}
+    public void configure(PluginContext c){
+        ctx=c;client=c.getClient();
+        // ★确保 GhostRuntime 已装当前 client (Bootstrap 通常已 install, 这里幂等兜底),
+        //   否则 api().objects()/invokeObject() 会走 client=null 的安全默认返回空。
+        try{ com.ghost.api.shim.GhostRuntime.install(client); }catch(Throwable e){}
+    }
 
     public void startUp(){
         try{
@@ -881,36 +886,49 @@ public final class NavBot implements Plugin {
     private boolean isStairName(String n){ return n.contains("stair")||n.contains("ladder")||
         n.contains("trapdoor")||n.contains("hatch"); }
 
-    /** 现场扫描障碍object: 设备TileObject无actions/plane, 用name白名单命中(等效PC Ghost objects()+白名单)。
-     *  只保留靠近玩家<=3格、且是障碍类(door/gate/stair/fence...)的object。 */
+    /** ★现场扫描障碍object: 1:1 用 PC Ghost 的 GhostRuntime.api().objects() (id/name/x/y/plane/actions)。
+     *  该 API 端上经 AndroidOSRS.objectList() -> ObjectDefs.get(oid) 查真实 name+actions, 关门=11773[Open]/开门=11774[Close],
+     *  并带真 plane。白名单 = name 命中 OR 任一 action 在 PASS_ACTS (与 OfficialNav.scanObstacles 完全一致)。 */
+    private boolean obsDumped=false;
     private java.util.List<ObsObj> scanObstacles(int px,int py){
         java.util.List<ObsObj> out=new java.util.ArrayList<>();
         try{
-            java.util.List<com.astrastudio.api.model.TileObject> all=client.getTileObjects();
+            java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
+            if(!obsDumped){
+                obsDumped=true;
+                ctx.log("[opener诊断] objects() 共 "+(all==null?0:all.size())+" 个");
+            }
             if(all==null)return out;
-            for(com.astrastudio.api.model.TileObject o:all){
-                if(o==null||o.getId()<=0)continue;
-                com.astrastudio.api.model.WorldPoint wp=o.getWorldLocation(); if(wp==null)continue;
-                int d=Math.abs(wp.getX()-px)+Math.abs(wp.getY()-py); if(d>3)continue;
-                String nm=o.getName()==null?"":o.getName().toLowerCase();
-                if(!isObsName(nm))continue;
-                ObsObj oo=new ObsObj(); oo.id=o.getId(); oo.x=wp.getX(); oo.y=wp.getY();
-                oo.name=nm; oo.acts=new java.util.ArrayList<>(); oo.stair=isStairName(nm);
-                // ★真值优先: 按 def id 查官方 ObjectDef.actions(PC Ghost 同款)。
-                //   关门 id=11773 -> [Open]；开门 id=11774 -> [Close]，不再按 name 同时猜 open+close。
-                String defActs=doorActs(oo.id);
-                if(!defActs.isEmpty()){
-                    for(String part:defActs.split(",")) oo.acts.add(part.trim().toLowerCase());
-                }else{
-                    // def 表查不到时(新 id/未知物体)才退回 name 推断，且不再同时塞 open+close
-                    if(isStairName(nm)){ oo.acts.add("climb-up"); oo.acts.add("climb-down"); }
-                    else if(nm.contains("fence")||nm.contains("railing")||nm.contains("stile")){ oo.acts.add("climb-over"); }
-                    else if(nm.contains("gate")||nm.contains("door")){ oo.acts.add("open"); }
-                    else oo.acts.add("open");
+            int dumpN=0;
+            for(java.util.Map<String,Object> m:all){
+                if(m==null)continue;
+                int id=m.get("id") instanceof Number?((Number)m.get("id")).intValue():0;
+                if(id<=0)continue;
+                String nm=String.valueOf(m.getOrDefault("name","")).toLowerCase();
+                int x=m.get("x") instanceof Number?((Number)m.get("x")).intValue():0;
+                int y=m.get("y") instanceof Number?((Number)m.get("y")).intValue():0;
+                int pl=m.get("plane") instanceof Number?((Number)m.get("plane")).intValue():0;
+                java.util.List<String> acts=new java.util.ArrayList<>();
+                Object raw=m.get("actions");
+                if(raw instanceof java.util.List) for(Object a:(java.util.List<?>)raw) if(a!=null) acts.add(String.valueOf(a).toLowerCase());
+                boolean hit=isObsName(nm);
+                for(String a:acts) if(isPassAct(a)){hit=true;break;}
+                if(dumpN<24 || hit){
+                    ctx.log("[opener诊断] "+(hit?"HIT ":"    ")+"id="+id+" name='"+nm+"' @("+x+","+y+",p"+pl+") acts="+acts);
+                    dumpN++;
                 }
+                if(!hit)continue;
+                // ★双重兜底: objects() 若没带 actions(端上 def 表查不到) -> 用内嵌 DOOR_ACTS 表补齐真值
+                if(acts.isEmpty()){
+                    String defActs=doorActs(id);
+                    if(!defActs.isEmpty()) for(String part:defActs.split(",")) acts.add(part.trim().toLowerCase());
+                }
+                ObsObj oo=new ObsObj(); oo.id=id; oo.x=x; oo.y=y; oo.pl=pl;
+                oo.name=nm; oo.acts=acts; oo.stair=isStairName(nm);
+                for(String a:acts) if(a.startsWith("climb")){oo.stair=true;break;}
                 out.add(oo);
             }
-        }catch(Throwable e){}
+        }catch(Throwable e){ctx.log("[opener诊断] EX "+e);}
         return out;
     }
 
@@ -957,17 +975,32 @@ public final class NavBot implements Plugin {
                 return true;
             }
         }
-        // 3) 门候选: ★设备getTileObjects坐标错位(door11773报在3218,3471,真值3219,3472),
-        //   不能按object错报坐标过滤。scanObstacles已限定玩家附近d<=3+门名白名单。
-        //   前方障碍格(tx,ty)上的门就是障碍物, 门的发包坐标统一用障碍格真坐标(tx,ty)。
-        java.util.List<int[]> ranked=new java.util.ArrayList<>();
+        // 3) ★PC Ghost 官方双重约束 (OfficialNav 1:1): 候选必须同时
+        //   (a) 贴着障碍格 dTarget<=OBS_NEAR  (b) 落在路径坐标上 dPath<=OBS_NEAR。
+        //   score = onTile*100000 + actRank*10000 + dTarget*100 + dPath。
+        //   ★端上 object 坐标偶有 1 格错位, 故 near 用 OBS_NEAR=2 容差(与 PC 同值), 不再一刀切全放行。
+        java.util.List<int[]> ranked=new java.util.ArrayList<>();  // {obsIdx, dPath, dTarget, score}
         for(int oi=0;oi<obs.size();oi++){
             ObsObj o=obs.get(oi);
+            int near=OBS_NEAR;
+            int dTarget=Math.abs(o.x-tx)+Math.abs(o.y-ty);
+            if(dTarget>near)continue;
+            int dPath=OBS_NEAR+1;
+            for(int[] q:ahead){
+                int dd=Math.abs(o.x-q[0])+Math.abs(o.y-q[1]);
+                if(dd<dPath){dPath=dd; if(dPath<=1)break;}
+            }
+            if(dPath>near)continue;
+            int onTile=(o.x==tx&&o.y==ty)?0:1;
             int actRank=2;
-            for(String a:o.acts){ if(a.equals("open")||a.equals("cross")||a.equals("enter")||a.equals("pass-through")){actRank=0;break;} }
+            for(String a:o.acts){
+                if(a.equals("open")||a.equals("close")||a.equals("cross")||a.equals("enter")
+                   ||a.equals("pass-through")||a.equals("pass through")){actRank=0;break;}
+                if(a.equals("climb-over")||a.equals("climb over")){actRank=1;break;}
+            }
             if(o.stair)actRank=3; // opener只管门; 楼梯交给跨层分支
-            int score=actRank*10000 + (o.x==tx&&o.y==ty?0:100);
-            ranked.add(new int[]{oi,0,0,score});
+            int score=onTile*100000 + actRank*10000 + dTarget*100 + dPath;
+            ranked.add(new int[]{oi,dPath,dTarget,score});
         }
         // 4) 假门证伪: 有障碍格但无object候选 -> 计3次直接走过
         if(ranked.isEmpty()){
@@ -1014,14 +1047,26 @@ public final class NavBot implements Plugin {
         }
         if(lastDoorInvokeTick>=0&&t-lastDoorInvokeTick<40)return true;
         lastDoorInvokeTick=t;
-        // 6) ★发op88开门: 用障碍格真坐标(tx,ty)作门坐标(设备getTileObjects错报坐标不可用)。
-        //   楼梯成功 Likewise用object真坐标; 门door11773真值(3219,3472)即障碍格。
-        //   只发一次, 不叠加interactObject(否则同tick两个op88 toggle两次=没开), 这是PC Ghost防toggle核心。
-        sendObj1(best.id,tx,ty);
+        // 6) ★PC Ghost 同款交互: GhostRuntime.api().invokeObject(id,x,y,slot), slot=actions.indexOf(INVOKE_PRIORITY)。
+        //   invokeObject -> AndroidOSRS.call("invoke_object") -> client.interactObjectSlot(oid,x,y,slot) -> native 引擎正常 seq。
+        //   坐标用障碍格真坐标(tx,ty): 端上 object 锚点偶有1格错位, 已验证门11773真值(3219,3472)=障碍格。
+        //   只发一次, 不叠加另一个发包(否则同tick两个op88 toggle两次=没开), 这是PC Ghost防toggle核心。
+        int slot=0; boolean found=false;
+        for(String want:INVOKE_PRIORITY){
+            int idx=best.acts.indexOf(want);
+            if(idx>=0){slot=idx;found=true;break;}
+        }
+        if(!found) for(int i=0;i<best.acts.size();i++) if(isPassAct(best.acts.get(i))){slot=i;break;}
+        try{
+            com.ghost.api.shim.GhostRuntime.api().invokeObject(best.id,tx,ty,slot);
+        }catch(Throwable e){
+            ctx.log("[opener] invoke异常 "+e+" -> 回退 sendObj1");
+            sendObj1(best.id,tx,ty);
+        }
         if(!best.stair){crossGateTick.put(key,nowMs);crossGateFoot.put(key,foot);}
         int n=doorOscN.containsKey(key)?doorOscN.get(key)+1:1; doorOscN.put(key,n);
-        ctx.log("[opener] ★invoke id="+best.id+" '"+best.name+"' 发包真坐标("+tx+","+ty+
-            ") 设备报("+best.x+","+best.y+") 落脚("+foot[0]+","+foot[1]+") n="+n);
+        ctx.log("[opener] ★invoke id="+best.id+" '"+best.name+"' slot="+slot+" acts="+best.acts+
+            " 发包坐标("+tx+","+ty+") 落脚("+foot[0]+","+foot[1]+") n="+n);
         // 7) 门振荡: 同门open>=5次且接近目标 -> 冲目标
         if(n>=5&&Math.abs(mx-goalX)+Math.abs(my-goalY)<=8){
             if(lastWalkTick<0||t-lastWalkTick>=15){client.walkTo(goalX,goalY);lastWalkTick=t;}
