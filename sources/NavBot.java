@@ -4113,6 +4113,9 @@ public final class NavBot implements Plugin {
     private final java.util.Map<String,int[]> crossGateFoot=new java.util.HashMap<>();
     private final java.util.Map<String,Integer> doorOscN=new java.util.HashMap<>();
     private final java.util.Map<String,Integer> fakeDoorN=new java.util.HashMap<>();
+    // ★PC同款防死循环: 现场确认走不通的"假障碍格"加入屏蔽集, astar 绕路(而非无限撞同一格)。
+    //   实测 3203,3476 p2 对着 3203,3475 假门空发 139 tick 卡死, 根因就是假门证伪不屏蔽+重规划又选同一格。
+    private final java.util.Set<Long> blockedTiles=new java.util.HashSet<>();
     private static final class ObsObj { int id,x,y,pl; String name; java.util.List<String> acts; boolean stair; }
 
     public void configure(PluginContext c){
@@ -4152,6 +4155,7 @@ public final class NavBot implements Plugin {
 
     private void setGoal(int x,int y,int p,String n){
         goalX=x;goalY=y;goalP=p;goalName=n;path.clear();pathIdx=0;
+        blockedTiles.clear();
         lastWalkTick=-1;lastInteractTick=-1;stuckTicks=0;interactTries=0;
         legStartTick=client.getTickCount();
         ctx.log("[实时导航] ★目标 "+n+" ("+x+","+y+",p"+p+")");
@@ -4224,6 +4228,8 @@ public final class NavBot implements Plugin {
                 if(i<n){nx=nb[i*4];ny=nb[i*4+1];np=nb[i*4+2];cost=nb[i*4+3];}
                 else{Edge e=cross.get(i-n);nx=e.dx;ny=e.dy;np=e.dp;cost=1;
                      eoid=e.oid; eex=e.sx; eey=e.sy;}
+                // ★已证伪的假障碍格: 本段内不再选它, 强制 A* 绕路
+                if(blockedTiles.contains(key(nx,ny,np))) continue;
                 double ng=c.g+cost;
                 long nk=key(nx,ny,np);
                 PtState old=best.get(nk);
@@ -4257,6 +4263,11 @@ public final class NavBot implements Plugin {
         boolean needReplan=path.isEmpty()||pathIdx>=path.size()||stuckTicks>60;
         if(needReplan){
             List<Pt> p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
+            // 屏蔽集把唯一通路也堵死时: 清空后重算一次, 避免整段导航停滞
+            if(p.isEmpty()&&!blockedTiles.isEmpty()){
+                blockedTiles.clear();
+                p=astar(me.getX(),me.getY(),me.getPlane(),goalX,goalY,goalP);
+            }
             if(p.isEmpty()){
                 if(t-lastLogTick>=100){lastLogTick=t;ctx.log("[实时导航] 规划失败 "+me+" -> "+goalName);}
                 stuckTicks=0; return;
@@ -4397,13 +4408,64 @@ public final class NavBot implements Plugin {
         return out;
     }
 
+    /** ★障碍格真值: 直接读 (wx,wy,plane) 单格的 4 类 tile slot, 1:1 PC Ghost sceneObjects(tile)。
+     *  不经过 objects() 的窗口/cap/坐标错报; name/actions 由 ObjectDefs(官方 objects_defs.json) 查真值。 */
+    private java.util.List<ObsObj> readTileObstacles(int wx,int wy,int p){
+        java.util.List<ObsObj> out=new java.util.ArrayList<>();
+        try{
+            int[] raw=com.astrastudio.runtime.internal.NativeBridge.nativeTileObjects(wx,wy,p);
+            if(raw==null||raw.length<3)return out;
+            for(int i=0;i+2<raw.length;i+=3){
+                int kind=raw[i], id=raw[i+1], shape=raw[i+2];
+                if(id<=0)continue;
+                String[] def=com.astrastudio.runtime.internal.ObjectDefs.get(id);
+                String nm=(def!=null&&def[0]!=null)?def[0].toLowerCase():"";
+                java.util.List<String> acts=new java.util.ArrayList<>();
+                if(def!=null&&def[1]!=null){
+                    for(String a:def[1].split(",")) if(!a.trim().isEmpty()) acts.add(a.trim().toLowerCase());
+                }
+                // ★端上最后一道真值兜底: 若 objects() 里有同 id 的现场项, 用它的 name/actions 覆盖静态表
+                //   (PC Ghost 的 ObjectDef.actions 随时态变化, 静态表只知道基础 id 语义)。
+                try{
+                    java.util.List<java.util.Map<String,Object>> all=com.ghost.api.shim.GhostRuntime.api().objects();
+                    if(all!=null) for(java.util.Map<String,Object> m:all){
+                        if(m==null)continue;
+                        int oid=m.get("id") instanceof Number?((Number)m.get("id")).intValue():0;
+                        if(oid!=id)continue;
+                        String rn=String.valueOf(m.getOrDefault("name","")).toLowerCase();
+                        if(!rn.isEmpty())nm=rn;
+                        java.util.List<String> ra=new java.util.ArrayList<>();
+                        Object rr=m.get("actions");
+                        if(rr instanceof java.util.List) for(Object a:(java.util.List<?>)rr) if(a!=null) ra.add(String.valueOf(a).toLowerCase());
+                        if(!ra.isEmpty())acts=ra;
+                        break;
+                    }
+                }catch(Throwable ignore){}
+                boolean passable=false;
+                for(String a:acts) if(isPassAct(a)){passable=true;break;}
+                boolean hit=isObsName(nm)||passable;
+                ctx.log("[opener] ★tile真值 kind="+kind+" id="+id+" shape="+shape+" name='"+nm
+                        +"' acts="+acts+" hit="+hit+" @("+wx+","+wy+",p"+p+")");
+                if(!hit||!passable)continue;
+                if(nm.contains("chest")||nm.contains("drawer")||nm.contains("cupboard")
+                   ||nm.contains("cabinet")||nm.contains("bank")||nm.contains("bush"))continue;
+                boolean stair=isStairName(nm);
+                for(String a:acts) if(a.startsWith("climb")){stair=true;break;}
+                if(stair)continue;
+                ObsObj oo=new ObsObj(); oo.id=id; oo.x=wx; oo.y=wy; oo.pl=p;
+                oo.name=nm; oo.acts=acts; oo.stair=false;
+                out.add(oo);
+            }
+        }catch(Throwable e){ctx.log("[opener] tile真值 EX "+e);}
+        return out;
+    }
+
     /** 每tick走路前: 路径前方有cost=2障碍边 -> 现场object验证+开门/爬。true=本tick被opener接管。
      *  1:1 移植 OfficialNav.tryOpenObstacle: cost2定位障碍格 -> 双约束匹配object -> score排序 ->
      *  假门证伪/门已开/防toggle -> invoke + 振荡检测。 */
     private boolean tryOpenObstacle(WorldPoint me,long t){
         int mx=me.getX(),my=me.getY(),mp=me.getPlane();
         java.util.List<ObsObj> obs=scanObstacles(mx,my);
-        if(obs.isEmpty())return false;
         // 1) 路径前方(同层、地图内)路径点
         java.util.List<int[]> ahead=new java.util.ArrayList<>();
         for(int i=pathIdx;i<path.size();i++){
@@ -4443,6 +4505,14 @@ public final class NavBot implements Plugin {
             }
         }
         if(tx<0)return false;
+        // ★★★障碍格权威真值: 直接读该格 tile slot。命中即以现场 id/name/actions 为准,
+        //   不再用 objects() 的错报坐标做双约束(这正是之前 name/action 找不到/找错的根因)。
+        boolean tileHit=false;
+        java.util.List<ObsObj> tileObs=readTileObstacles(tx,ty,mp);
+        if(!tileObs.isEmpty()){
+            obs=tileObs; tileHit=true;
+            ctx.log("[opener] ★障碍格真值命中 ("+tx+","+ty+",p"+mp+") n="+obs.size());
+        }
         // ★PC Ghost 只处理贴身障碍: 远处的 cost2 边先正常走路靠近, 不提前 invoke
         //   (实测会拿远处门 id 对着障碍格空发, 玩家原地打转)。
         if(Math.abs(tx-mx)+Math.abs(ty-my)>4)return false;
@@ -4454,44 +4524,39 @@ public final class NavBot implements Plugin {
                 return true;
             }
         }
-        // 3) ★PC Ghost 官方双重约束 (OfficialNav 1:1): 候选必须同时
-        //   (a) 贴着障碍格 dTarget<=OBS_NEAR  (b) 落在路径坐标上 dPath<=OBS_NEAR。
-        //   score = onTile*100000 + actRank*10000 + dTarget*100 + dPath。
-        //   ★端上 object 坐标偶有 1 格错位, 故 near 用 OBS_NEAR=2 容差(与 PC 同值), 不再一刀切全放行。
+        // 3) 候选评分: tileHit=直接从障碍格读到的真 object(权威), 免双约束;
+        //   否则走 PC Ghost 官方双重约束(同层 + dTarget<=2 + dPath<=2)。
         java.util.List<int[]> ranked=new java.util.ArrayList<>();  // {obsIdx, dPath, dTarget, score}
         for(int oi=0;oi<obs.size();oi++){
             ObsObj o=obs.get(oi);
-            // ★同层过滤(PC Ghost同款): 玩家在p2时, p1的门即使xy重合也不是本层障碍。
-            //   实测 GE2 p2 把 p1 的 11773@3219,3472 当障碍硬点, 原地打转 n>6。
-            if(o.pl!=mp)continue;
-            // ★端上 objects() 坐标/plane 抖实测不可信: 放宽容差会选到邻格假门(实测
-            //   best@3218,3472 却对 3219/3220,3472 障碍格硬点, 原地打转)。改为硬门槛:
-            //   候选必须正好落在障碍格上(onTile), 否则不认。PC Ghost 现场坐标准可容差,
-            //   端上坐标假, 用严格重合换取不误点。
-            int dTarget=Math.abs(o.x-tx)+Math.abs(o.y-ty);
-            if(dTarget>0)continue;
-            int near=OBS_NEAR;
-            int dPath=OBS_NEAR+1;
-            for(int[] q:ahead){
-                int dd=Math.abs(o.x-q[0])+Math.abs(o.y-q[1]);
-                if(dd<dPath){dPath=dd; if(dPath<=1)break;}
-            }
-            if(dPath>near)continue;
-            int onTile=(o.x==tx&&o.y==ty)?0:1;
+            if(o.pl!=mp)continue;   // 同层硬门槛(PC Ghost同款)
             int actRank=2;
             for(String a:o.acts){
                 if(a.equals("open")||a.equals("close")||a.equals("cross")||a.equals("enter")
                    ||a.equals("pass-through")||a.equals("pass through")){actRank=0;break;}
                 if(a.equals("climb-over")||a.equals("climb over")){actRank=1;break;}
             }
-            if(o.stair)actRank=3; // opener只管门; 楼梯交给跨层分支
-            int score=onTile*100000 + actRank*10000 + dTarget*100 + dPath;
+            if(o.stair)actRank=3;
+            if(tileHit){
+                // ★现场 tile 真值: 坐标就是障碍格本身, 无需再做 objects() 距离匹配
+                ranked.add(new int[]{oi,0,0,actRank*10000});
+                continue;
+            }
+            int dTarget=Math.abs(o.x-tx)+Math.abs(o.y-ty);
+            if(dTarget>0)continue;  // 端上 objects() 坐标错报: 严格重合, 不认邻格假门
+            int dPath=OBS_NEAR+1;
+            for(int[] q:ahead){
+                int dd=Math.abs(o.x-q[0])+Math.abs(o.y-q[1]);
+                if(dd<dPath){dPath=dd; if(dPath<=1)break;}
+            }
+            if(dPath>OBS_NEAR)continue;
+            int score=actRank*10000 + dTarget*100 + dPath;
             ranked.add(new int[]{oi,dPath,dTarget,score});
         }
         // 3.5) ★端上 objects() 坐标静态缓存错报(门报p0远处), 双约束会把面前门全过滤。
         //   回退: 只按 def 真值 actions 取门(open/close)/闸门候选, 不依赖错报坐标;
         //   发包坐标仍用障碍格(tx,ty)。这是端上对 PC Ghost 双约束的坐标适配。
-        if(ranked.isEmpty()){
+        if(ranked.isEmpty()&&!tileHit){
             ctx.log("[opener] 双约束无候选 -> def真值门回退 obs="+obs.size());
             for(int oi=0;oi<obs.size();oi++){
                 ObsObj o=obs.get(oi);
@@ -4526,7 +4591,10 @@ public final class NavBot implements Plugin {
                 //   靠官方引擎走进去(若是假门则可通行)。绝不 walkTo(foot): foot 在障碍格
                 //   另一侧, 玩家够不到会永远卡住(实测 3202,3476 卡死)。持续尝试到位置变化。
                 if(lastWalkTick<0||t-lastWalkTick>=10){client.walkTo(tx,ty);lastWalkTick=t;}
-                ctx.log("[opener] ★假门证伪 走过 ("+tx+","+ty+") me="+mx+","+my+" n="+n);
+                // ★PC同款防死循环: 该格已现场证伪为假障碍, 本段路径屏蔽并立即重规划绕路
+                blockedTiles.add(key(tx,ty,mp));
+                path.clear(); pathIdx=0; lastWalkTick=-1;
+                ctx.log("[opener] ★假门证伪 走过 ("+tx+","+ty+") me="+mx+","+my+" n="+n+" -> 屏蔽并绕路");
                 return true;
             }
             return false;
