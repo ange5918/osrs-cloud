@@ -1,13 +1,14 @@
 package myplugin;
 
-import com.ghost.api.Declaration;
-import com.ghost.api.Kind;
-import com.ghost.api.LoopedPlugin;
-import com.ghost.api.Wait;
-import com.ghost.api.entities.*;
-import com.ghost.api.items.Bank;
-import com.ghost.api.items.GrandExchange;
-import com.ghost.api.items.Item;
+import com.astrastudio.api.Plugin;
+import com.astrastudio.api.annotation.PluginDescriptor;
+import com.astrastudio.api.annotation.Subscribe;
+import com.astrastudio.api.event.GameTick;
+
+import com.ghost.api.entities.NPC;
+import com.ghost.api.entities.Player;
+import com.ghost.api.entities.Players;
+import com.ghost.api.entities.NPCs;
 import com.ghost.api.movement.Coord;
 import com.ghost.api.movement.Place;
 import com.ghost.api.movement.Walker;
@@ -15,85 +16,137 @@ import com.ghost.api.skills.Combat;
 import com.ghost.api.skills.Skill;
 import com.ghost.api.skills.Skills;
 import com.ghost.api.widgets.Dialog;
-import com.ghost.api.widgets.Tab;
-import com.ghost.api.widgets.Tabs;
-import com.ghost.api.widgets.Widgets;
+
+import com.astrastudio.nav.OfficialNav;
+import com.astrastudio.api.model.Client;
+import com.astrastudio.api.model.WorldPoint;
 
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
- * Ghost jar 脚本模板 —— 最小可跑的 LoopedPlugin。
+ * MyPlugin —— 杀鸡脚本（AstraStudio Plugin 骨架，云端加载器可加载）。
  *
- * 写你自己的脚本：照着这个类改 onLoop() 里的逻辑，或复制本文件换个类名/包名。
- * 每一个 ghost jar 脚本必须有三样东西：
- *   1) 继承 LoopedPlugin
- *   2) declare() 声明要读哪些数据切片（不声明就读不到）
- *   3) onLoop() 每 tick(~600ms) 调用一次，写你的状态机
+ * 之前版本继承 com.ghost.api.LoopedPlugin（实现 ghost 包的 Plugin），
+ * 而云端加载器 PluginManager 要求 com.astrastudio.api.Plugin + @PluginDescriptor，
+ * 接口包名不同 -> 被"框架拒绝加载"，脚本从未运行，自然走不到鸡区。
+ * 本版改成 implements com.astrastudio.api.Plugin + @PluginDescriptor + @Subscribe GameTick，
+ * 与已验证可加载的 fish.Fish 同构；寻路改用 APK 内 OfficialNav（真跨区寻路）。
  *
- * 编译/打包/运行见工程根目录的 build.bat 和 README.md。
+ * 启停: echo stop  > /data/local/tmp/myplugin.txt  停 / echo start 启 / echo stat 状态
+ * 日志: adb logcat -d -s System.out:I | grep -E "MyPlugin|qqqqq|dddd"
  */
-public final class MyPlugin extends LoopedPlugin {
+@PluginDescriptor(
+        name = "MyPlugin(杀鸡)",
+        description = "Ghost API 真值门面 + 官方 astar3 寻路：走到鸡区 → 找 Chicken → Attack",
+        tags = {"战斗", "Ghost API", "官方寻路"},
+        enabledByDefault = true
+)
+public final class MyPlugin implements Plugin {
+    private PluginContext ctx;
+    private Client client;
+    private OfficialNav nav;
 
-    // ===== 插件元信息 =====
-    @Override public Kind kind() { return Kind.MAIN; }
-    @Override public String name() { return "Fish"; }
-    @Override public String description() { return "Ghost jar 脚本模板：打印玩家坐标"; }
-    @Override public String version() { return "1.0"; }
+    private static final String CMD_FILE = "/data/local/tmp/myplugin.txt";
+    private static final int EVERY = 30;   // 20ms/tick -> 约600ms, 对齐 Ghost onLoop
+    private static final int MINE_X = 3178, MINE_Y = 3296, MINE_PLANE = 0;
 
-    /**
-     * 声明数据切片。需要什么加什么，别全加（多余切片浪费性能）。
-     * 常用：withObjects / withInventory / withSkills / withBank / withReachable
-     */
-    @Override public Declaration declare() {
-        return Declaration.none()
-                .withObjects()    // → TileObjects 域
-                .withNpcs()       // → NPCs 域
-                .withInventory()  // → Inventory 域
-                .withBank()       // → Bank 域
-                .withSkills()     // → Skills 域
-                .withReachable()  // → Tiles 可达性判定
-                .withWidgets()    // → Widgets 域
-                .withVars() .withWorld() .withGround() .withScreen() .withCamera() .withDefinitions();
+    private long loops = 0;
+    private boolean active = true;
+    private String lastCmd = "";
+    private int poll = 0;
+    private int restLeft = 0;
+    private long lastDirectWalk = -1;
+    private Coord lastPos = null;
+    private int stuckTicks = 0;
+
+    @Override
+    public void configure(PluginContext context) {
+        this.ctx = context;
+        this.client = context.getClient();
     }
 
-    private int tick = 0;
-
-    // ===== 攻击后休息：Ghost 延时的最短正确写法 =====
-    // Wait 是不可变计时器：必须"成员持有 + 每 tick 调 pending()"才会走时。
-    // 单独写 Wait.ticks(4,5); 丢掉对象 = 完全没用；它也不是 sleep，不会阻塞线程。
-    private final Wait restWait = Wait.ticks(4, 5);  // 攻击后休息 4~5 tick（约 2.4~3 秒）
-    private boolean resting = false;                 // true=正在休息，不去找下一只
-
-    private static Place placeFromBottomLeft(String name, Coord bottomLeft, int width, int height) {
-        Coord topRight = new Coord(bottomLeft.x() + width - 1,
-                                   bottomLeft.y() + height - 1,
-                                   bottomLeft.floor());
-        return Place.fromCorners(name, bottomLeft, topRight);
+    @Override
+    public void startUp() {
+        log("启动。启停: echo stop > " + CMD_FILE + " 停 / echo start 启 / echo stat 状态");
+        nav = new OfficialNav(client, ctx);
+        nav.init();
+        nav.setGoal(MINE_X, MINE_Y, MINE_PLANE, "鸡区");
     }
 
-    private static boolean inRect(Coord c, Place p) {
-        if (c.floor() != p.centre().floor()) return false;
-        int minX = p.centre().x() - (p.width() - 1) / 2;
-        int minY = p.centre().y() - (p.height() - 1) / 2;
-        return c.x() >= minX && c.x() < minX + p.width()
-            && c.y() >= minY && c.y() < minY + p.height();
+    @Override
+    public void shutDown() {
+        active = false;
+        log("已停止，共 " + loops + " tick");
     }
 
-    @Override public void onLoop() {
-        tick++;
+    private void pollCommand() {
+        if (++poll < 10) return;
+        poll = 0;
+        try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.FileReader(CMD_FILE))) {
+            String line = r.readLine();
+            if (line == null) return;
+            line = line.trim();
+            if (line.isEmpty() || line.equals(lastCmd)) return;
+            lastCmd = line;
+            if (line.equalsIgnoreCase("stop")) {
+                active = false;
+                log("收到 stop -> 已停止");
+            } else if (line.equalsIgnoreCase("start")) {
+                active = true;
+                log("收到 start -> 已启动");
+            } else if (line.equalsIgnoreCase("stat")) {
+                log("状态: " + (active ? "运行中" : "已停") + ", tick=" + loops);
+            }
+        } catch (java.io.FileNotFoundException e) {
+            // 无指令文件, 静默
+        } catch (Exception e) {
+            log("读指令异常: " + e);
+        }
+    }
+
+    private void log(String s) {
+        ctx.log("[MyPlugin] " + s);
+    }
+
+    @Subscribe
+    public void onTick(GameTick tick) {
+        pollCommand();
+        if (!active) return;
+
         Optional<Player> meOpt = Players.getLocal();
-        if (meOpt.isEmpty()) {
-            // 前 3 次、之后每 60 tick 打印一次，避免刷屏；让"拿不到玩家"可见
-            if (tick <= 3 || tick % 60 == 0) {
-                log("[诊断 tick=" + tick + "] 未获取到本地玩家（账号未登录/桥未连上/切片未就绪），跳过本轮");
+        if (!meOpt.isPresent()) {
+            if (loops <= 3 || loops % 60 == 0) {
+                log("[诊断] 未获取到本地玩家(账号未登录/桥未连上/切片未就绪), 跳过本轮");
             }
             return;
         }
         Player me = meOpt.get();
         Coord here = me.coord();
-        // ★ getAttackStyle() 返回 Integer（可为 null）：bridge 模式若没喂 vars
-        //   切片它就是 null，直接 != 0 会自动拆箱抛 NPE 刷爆 stderr。
-        //   必须先判 null；取不到时跳过切换，绝不空拆箱。
+        if (here == null) return;
+        loops++;
+
+        final Place mine = Place.fromCorners("杀鸡",
+                new Coord(3173, 3289, 0), new Coord(3184, 3303, 0));
+
+        // ===== 不在鸡区：官方 astar3 寻路走过去 =====
+        if (!mine.contains(here)) {
+            WorldPoint meWp = client.getLocalPlayerLocation();
+            if (nav != null && meWp != null) nav.tick(meWp);
+            if (nav == null || nav.lastPlanFailed) {
+                long t = tick.getTick();
+                if (t - lastDirectWalk >= 100) {
+                    lastDirectWalk = t;
+                    log("官方寻路暂未规划出路径, 当前 " + here + " (等待重规划)");
+                }
+            }
+            return;
+        }
+
+        // ===== 已在鸡区：杀鸡流程 =====
+        if (tick.getTick() % EVERY != 0) return;
+        if (restLeft > 0) { restLeft--; return; }
+
         Integer style = Combat.getAttackStyle();
         if (style != null) {
             int attack = Skills.getLevel(Skill.ATTACK);
@@ -101,64 +154,43 @@ public final class MyPlugin extends LoopedPlugin {
             int defence = Skills.getLevel(Skill.DEFENCE);
             int want;
             if (attack <= strength || attack <= defence) {
-                want = 0;   // Accurate
+                want = 0;
             } else if (strength <= defence) {
-                want = 1;   // Aggressive
+                want = 1;
             } else {
-                want = 3;   // Defensive
+                want = 3;
             }
-            if (Dialog.isOpen()){
-                Dialog.continueDialog();return;
-            }
-            if (style != want) {
-                Combat.setAttackStyle(want);
-            }
+            if (Dialog.isOpen()) continueDialog();
+            if (style != want) Combat.setAttackStyle(want);
         }
+
         if (lastPos != null && here.x() == lastPos.x() && here.y() == lastPos.y()
                 && Walker.isWalking()) stuckTicks++;
         else stuckTicks = 0;
         lastPos = here;
-        // 休息中：pending() 每 tick 推进计时，没到时间就直接返回，不找下一只
-        if (resting) {
-            if (restWait.pending(() -> false)) return;
-            resting = false;   // 时间到，往下走
-        }
 
-        log("qqqqq : targeting=" + me.isTargetingNpc() + " , moving=" + me.isMoving() + " , idle=" + me.isIdle());
-        if (me.isTargetingNpc() || me.isMoving() || !me.isIdle()) {
-            return;
-        }
-        log("bbbb");
-        Place mine = placeFromBottomLeft("杀鸡", new Coord(3173, 3289, 0), 12, 15);
-        if (mine.contains(here)) {
-        log("ccc");
-        for (Item item:Bank.getAll()){
-            Bank.withdraw(item,5);
+        log("qqqqq : targeting=" + me.isTargetingNpc() + " , moving=" + me.isMoving()
+                + " , idle=" + me.isIdle() + " , stuck=" + stuckTicks + " , here=" + here);
+        if (me.isTargetingNpc() || me.isMoving() || !me.isIdle()) return;
 
-        }
-            var target = NPCs.getNearest(x -> x != null
-                    && x.name().isPresent()          // 无名 NPC 跳过，避免 Optional.get() 抛 NoSuchElementException
-                    && x.name().get().contains("Chicken")
-                    && x.interacting().isEmpty()
-                    && mine.contains(x.coord()));
-            if (target.isPresent()) {
-                log("dddd  ："+target.get());
-                target.get().interact("Attack");
-                resting = true;      // 攻击后进入休息
-                restWait.reset();    // 重新开始计时 4~5 tick
+        Optional<NPC> target = NPCs.getNearest(new Predicate<NPC>() {
+            @Override public boolean test(NPC n) {
+                return n != null
+                        && n.name().isPresent()
+                        && n.name().get().contains("Chicken")
+                        && n.coord() != null
+                        && mine.contains(n.coord());
             }
-        } else {
-            walkto(mine.centre());
-            // GrandExchange.sell(,1,4);  // 遗留坏代码(缺参数),独立版编译时注释
+        });
+        if (target.isPresent()) {
+            NPC t = target.get();
+            log("dddd ：" + t.name().orElse("Chicken") + " @ " + t.coord());
+            t.interact("Attack");
+            restLeft = 4;
         }
     }
 
-    private Coord lastPos = null;
-    private int stuckTicks = 0;
-    private void walkto(Coord target) {
-        Walker.walkTo(target);
-    }
-    @Override public void onStop() {
-        info("MYPLUGIN", "已停止，共运行 " + tick + " tick");
+    private void continueDialog() {
+        log("continueDialog (shim 空操作)");
     }
 }
