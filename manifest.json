@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 13,
+  "version": 7,
   "updated": "2026-11-24",
   "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
@@ -11,7 +11,7 @@
       "type": "dex",
       "entry": "myplugin.MyPlugin",
       "path": "dex/myplugin.dex",
-      "sha256": "b3c7c8c805bc8e540e89ea0347e2a8a466871a431e62424bede6c387c9b1aded",
+      "sha256": "46a9ec47eeb88030e63de2b7e699cfa0c39ba9b3ba2d332eb648ee5bb67dce3b",
       "class": "myplugin.MyPlugin"
     },
     {

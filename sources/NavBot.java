@@ -4458,7 +4458,7 @@ public final class NavBot implements Plugin {
                 lastInteractTick=t;interactTries++;
                 int opt=climbOpt(oid,up);
                 sendStair(oid,sx,sy,up);
-                ctx.log("[实时导航] ↑楼梯 obj="+oid+" opt"+opt+(opt==2?"(op72)":opt==1?"(op88)":"(op"+opt+")")+
+                ctx.log("[实时导航] ↑楼梯 obj="+oid+" opt"+opt+(opt==2?"(op73)":opt==1?"(op48)":"(op"+opt+")")+
                     (liveUsed?"(现场真值)":"(官方edge/guess)")+" @"+sx+","+sy+" 玩家"+me.getX()+","+me.getY()+
                     " p"+me.getPlane()+"->"+target.p+" try"+interactTries);
             }
@@ -5148,13 +5148,13 @@ public final class NavBot implements Plugin {
         return pick;
     }
 
-    /** object1(op88)通用发包: 门Open(slot0)。payload与sendStair opt1一致。 */
+    /** ★v243.1 通用 object slot1 发包 (op48): 门Open/Climb-up。body 与今天实测 make_oploc_packet 一致。 */
     private void sendObj1(int oid,int x,int y){
-        int lo=oid&0xff,hi=(oid>>8)&0xff,b2=(oid>>16)&0xff;
+        int o0=oid&0xff,o1=(oid>>8)&0xff,o2=(oid>>16)&0xff;
         int X=x&0xffff,Y=y&0xffff;
-        int xX=(X&0xff)^0x80,hiX=(X>>8)&0xff,hiY=(Y>>8)&0xff,loY=Y&0xff;
-        client.sendPacket(88,new byte[]{(byte)xX,(byte)hiX,(byte)hiY,(byte)loY,0,
-            (byte)lo,(byte)hi,(byte)b2,0});
+        int xb=X&0xff,xh=(X>>8)&0xff,yh=(Y>>8)&0xff,yb=(Y&0xff)^0x80;
+        client.sendPacket(48,new byte[]{(byte)0x80,(byte)0x80,(byte)xb,(byte)xh,(byte)yh,(byte)yb,
+            (byte)o2,(byte)o1,(byte)o0});
     }
 
     /** ★路径A坐标轮换(n=1,2): n1用门自身锚点(best.x,best.y,官方TileObject真值),
@@ -5301,28 +5301,27 @@ public final class NavBot implements Plugin {
      *     ★v2.14 实测: 16672 Climb-down(手动点击真包 raw=0 hex=...800c04204100870c80)
      *       服务器确实执行(p1->p0), 之前误判"无包"导致下楼永远失败。 */
     private void sendStair(int oid,int x,int y,boolean up){
-        int lo=oid&0xff,hi=(oid>>8)&0xff,b2=(oid>>16)&0xff;
+        // ★v243.1 body 公式 (data/opcodes_2431_truth.json / ghost_sender.make_oploc_packet):
+        //   xb=x&ff xh=x>>8 yb=(y&ff)^80 yh=y>>8 yb0=y&ff o0/o1/o2=oid低/中/高
+        int o0=oid&0xff,o1=(oid>>8)&0xff,o2=(oid>>16)&0xff;
         int X=x&0xffff,Y=y&0xffff;
-        int xX=(X&0xff)^0x80,hiX=(X>>8)&0xff;
-        int hiY=(Y>>8)&0xff,loY=Y&0xff,yX=(Y&0xff)^0x80;
+        int xb=X&0xff,xh=(X>>8)&0xff,yh=(Y>>8)&0xff,yb=(Y&0xff)^0x80,yb0=Y&0xff;
         int opt=climbOpt(oid,up);
-        if(opt==2){
-            client.sendPacket(72,new byte[]{(byte)hiY,(byte)yX,(byte)0x80,(byte)b2,
-                (byte)lo,(byte)hi,0,(byte)(X&0xff),(byte)hiX});
-        }else if(opt==3){
-            // ★v2.14: 16672 Climb-down 真包 (oid 16672=0x4120, x3204=0x0c84,y3207=0x0c87
-            //   -> 80 0c 04 20 41 00 87 0c 80, 与用户手动点击抓包逐字节一致)
-            client.sendPacket(0,new byte[]{(byte)0x80,(byte)hiX,(byte)xX,
-                (byte)lo,(byte)hi,(byte)b2,(byte)loY,(byte)hiY,(byte)0x80});
-        }else if(opt==4){
-            client.sendPacket(56,new byte[]{0,(byte)0x80,(byte)hiY,(byte)yX,
-                (byte)lo,(byte)hi,(byte)b2,(byte)hiX,(byte)xX});
-        }else if(opt==5){
-            client.sendPacket(64,new byte[]{(byte)hiX,(byte)xX,(byte)lo,(byte)hi,(byte)b2,
-                (byte)0x80,(byte)yX,(byte)hiY,0});
-        }else{ // opt1 默认 (含单动作楼梯 56230/11807 的 Climb-up)
-            client.sendPacket(88,new byte[]{(byte)xX,(byte)hiX,(byte)hiY,(byte)loY,0,
-                (byte)lo,(byte)hi,(byte)b2,0});
+        if(opt==2){ // op73: [yh, yb0, 0, xb, xh, 0, o1, o0, 0]
+            client.sendPacket(73,new byte[]{(byte)yh,(byte)yb0,0,(byte)xb,(byte)xh,0,
+                (byte)o1,(byte)o0,0});
+        }else if(opt==3){ // op109: [yh, xb, 0, xh, yb, 0, o1, 0, o0]
+            client.sendPacket(109,new byte[]{(byte)yh,(byte)xb,0,(byte)xh,(byte)yb,0,
+                (byte)o1,0,(byte)o0});
+        }else if(opt==4){ // op42: [o1, 0, o0, 0x80, yh, yb, xb, xh, 0]
+            client.sendPacket(42,new byte[]{(byte)o1,0,(byte)o0,(byte)0x80,(byte)yh,(byte)yb,
+                (byte)xb,(byte)xh,0});
+        }else if(opt==5){ // op107: [o0, o1, 0, xb, xh, yb0, yh, 0, 0x80]
+            client.sendPacket(107,new byte[]{(byte)o0,(byte)o1,0,(byte)xb,(byte)xh,(byte)yb0,
+                (byte)yh,0,(byte)0x80});
+        }else{ // slot1 op48: [0x80,0x80, xb, xh, yh, yb, o2, o1, o0]
+            client.sendPacket(48,new byte[]{(byte)0x80,(byte)0x80,(byte)xb,(byte)xh,(byte)yh,(byte)yb,
+                (byte)o2,(byte)o1,(byte)o0});
         }
     }
 }

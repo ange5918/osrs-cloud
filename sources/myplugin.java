@@ -7,6 +7,7 @@ import com.ghost.api.Wait;
 import com.ghost.api.entities.*;
 import com.ghost.api.items.Bank;
 import com.ghost.api.items.GrandExchange;
+import com.ghost.api.items.Item;
 import com.ghost.api.movement.Coord;
 import com.ghost.api.movement.Place;
 import com.ghost.api.movement.Walker;
@@ -18,8 +19,6 @@ import com.ghost.api.widgets.Tab;
 import com.ghost.api.widgets.Tabs;
 import com.ghost.api.widgets.Widgets;
 
-import java.awt.geom.Area;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -133,6 +132,10 @@ public final class MyPlugin extends LoopedPlugin {
         Place mine = placeFromBottomLeft("杀鸡", new Coord(3173, 3289, 0), 12, 15);
         if (mine.contains(here)) {
         log("ccc");
+        for (Item item:Bank.getAll()){
+            Bank.withdraw(item,5);
+
+        }
             var target = NPCs.getNearest(x -> x != null
                     && x.name().isPresent()          // 无名 NPC 跳过，避免 Optional.get() 抛 NoSuchElementException
                     && x.name().get().contains("Chicken")
