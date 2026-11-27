@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 18,
+  "version": 19,
   "updated": "2026-11-24",
   "description": "源码容器仓库：悬浮窗下载 java 到本地，游戏内 eval class 并每 tick 调 onLoop()",
   "scripts": [
@@ -10,7 +10,7 @@
       "version": "2.1",
       "type": "java",
       "path": "src/myplugin_v21.java",
-      "sha256": "53bb8478b63e401bb0f312fb815aa6e69f06efa56bd1b6c4ae75b644e89d37d6"
+      "sha256": "3a81fa4116ed125d676eabf0f4333d045ceac90b8f37c0cb05a4f294b500295c"
     }
   ],
   "offsets": {
