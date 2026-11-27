@@ -1,16 +1,16 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 21,
-  "updated": "2026-11-24",
+  "version": 22,
+  "updated": "2026-11-27",
   "description": "设备端编译仓库：悬浮窗下载 java，手机本地 ecj+dx 编译成 dex，容器内 onLoop 每 tick 循环",
   "scripts": [
     {
       "name": "myplugin",
-      "desc": "MyPlugin 杀鸡脚本(标准LoopedPlugin): 悬浮窗下载java->手机编译dex->onLoop每tick",
-      "version": "3.0",
+      "desc": "MyPlugin 杀鸡脚本(标准LoopedPlugin, public class): 悬浮窗下载java->手机编译dex->onLoop每tick",
+      "version": "3.1",
       "type": "java",
-      "path": "src/myplugin_v30.java",
-      "sha256": "c29a687d20fb86e31e591d557258ec0d91c529a23cafb4e4697937254d967466"
+      "path": "src/MyPlugin_v31.java",
+      "sha256": "adae87ce387aa4f036eb9d2801be1461788364cd80b7facb04fae306e1ab61db"
     }
   ],
   "offsets": {
