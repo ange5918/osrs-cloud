@@ -1,16 +1,16 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 25,
-  "updated": "2026-11-27",
-  "description": "PowBot式脚本列表: 显示 MyPlugin, 首次编译后缓存 dex, 再次点名直接启动",
+  "version": 26,
+  "updated": "2026-11-28",
+  "description": "清空后仅保留 MyPlugin.java；设备端编译 dex 并缓存",
   "scripts": [
     {
       "name": "myplugin",
       "display": "MyPlugin",
-      "desc": "MyPlugin 杀鸡脚本(Android9兼容终版, 无lambda/Wait/真值门控)",
-      "version": "3.3",
+      "desc": "MyPlugin 杀鸡脚本(Android9兼容: 无isEmpty/lambda/真值门控)",
+      "version": "3.4",
       "type": "java",
-      "path": "src/MyPlugin_v33.java",
+      "path": "src/MyPlugin.java",
       "sha256": "e1564ee8839d57a21bf1fca3f4dc03f0b9867f063880b2cfcc57e51ed50a6c85"
     }
   ],
