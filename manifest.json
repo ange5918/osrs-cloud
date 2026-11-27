@@ -1,16 +1,16 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 14,
+  "version": 15,
   "updated": "2026-11-24",
-  "description": "源码容器仓库：悬浮窗下载 java 到本地，游戏内容器执行并调用 ghost api",
+  "description": "源码容器仓库：悬浮窗下载 java 到本地，游戏内 eval class 并每 tick 调 onLoop()",
   "scripts": [
     {
       "name": "myplugin",
-      "desc": "myplugin 杀鸡脚本(源码容器版): 坐标框内找鸡→Attack, 攻击后休息, 卡住重走",
-      "version": "1.0",
+      "desc": "MyPlugin 杀鸡脚本(标准class容器版): 悬浮窗下载java -> 容器eval -> 每tick调onLoop()",
+      "version": "2.0",
       "type": "java",
       "path": "src/myplugin.java",
-      "sha256": "033f69dae2e039a0fb544adcf5dc7c71a47cae4a6e2e2c4b5aadb54abbc6d004"
+      "sha256": "c6ed73fa71f6d2f92c736a17b15ed0d53bf1dabb889324d55f670ef9cc55a03f"
     }
   ],
   "offsets": {
