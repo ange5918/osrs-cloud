@@ -1,14 +1,14 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 30,
+  "version": 31,
   "updated": "2026-11-28",
-  "description": "恢复用户原始 Java（严格 sha 0d67…）；设备端改用 D8 desugar 支持 lambda",
+  "description": "强制废弃旧 dx dex 缓存，使用 D8 desugar 重编译用户原始源码",
   "scripts": [
     {
       "name": "myplugin",
       "display": "MyPlugin",
       "desc": "MyPlugin 杀鸡脚本(用户原始源码: lambda + Attack)",
-      "version": "3.5",
+      "version": "3.5.1",
       "type": "java",
       "path": "src/myplugin.java",
       "sha256": "0d67ea123579ad12ed8c3c389f306771ed9a495b08b034ad8be0d6bf540b6d5a"
