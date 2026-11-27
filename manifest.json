@@ -1,78 +1,9 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 8,
+  "version": 9,
   "updated": "2026-11-24",
-  "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
-  "scripts": [
-    {
-      "name": "myplugin",
-      "desc": "AstraStudio版杀鸡脚本(真正dex,可动态加载)",
-      "version": "2.2",
-      "type": "dex",
-      "entry": "myplugin.MyPlugin",
-      "path": "dex/myplugin.dex",
-      "sha256": "63fe40c6395eb70f09c7ee3be17b6971fbb4886fb44c7a677bbb52d12e4eb789",
-      "class": "myplugin.MyPlugin"
-    },
-    {
-      "name": "navbot",
-      "desc": "官方astar3精确复刻(内嵌steps3图+h=0):鸡区->L2->GE2",
-      "version": "2.83",
-      "type": "dex",
-      "path": "dex/navbot.dex",
-      "sha256": "c8503d96e85d7ec9227b43419bbb6290dc6bcf7713a3d34fe29af46a0c71b3f6",
-      "class": "navbot.NavBot",
-      "entry": "navbot.NavBot"
-    },
-    {
-      "name": "fish",
-      "desc": "Ghost API 真值门面 + 官方astar3寻路 杀鸡脚本",
-      "version": "2.0",
-      "type": "dex",
-      "path": "dex/fish.dex",
-      "sha256": "4058c163b7a0ae938a6235f21a079ca2020b1f40203cd6fac28b7365893a5286",
-      "class": "fish.Fish",
-      "entry": "fish.Fish"
-    },
-    {
-      "name": "e2e",
-      "desc": "全程Ghost API: L2取5coins->商店买1hammer",
-      "version": "1.0",
-      "type": "dex",
-      "path": "dex/e2e.dex",
-      "sha256": "9082c2a52e5d81f2763e34adb4c1c90d4d2c31b16557c100fb5345fc80774e03",
-      "class": "e2e.E2E",
-      "entry": "e2e.E2E"
-    },
-    {
-      "name": "objprobe",
-      "desc": "受控探针: scan附近object / click oid [slot]",
-      "version": "1.0",
-      "type": "dex",
-      "path": "dex/objprobe.dex",
-      "sha256": "67d5a77b664385c77deeb13bad9184be1cbefc548e121492e962c72b83a62b95",
-      "class": "objprobe.ObjProbe",
-      "entry": "objprobe.ObjProbe"
-    },
-    {
-      "name": "objprobe2",
-      "desc": "受控探针v2: 文件输出+clicknear+最近id",
-      "version": "1.0",
-      "type": "dex",
-      "path": "dex/objprobe2.dex",
-      "sha256": "365030444c0eecb7fe1cdcd37826aaf11528278e0ac08e2f47a9b5190fab6b3f",
-      "class": "objprobe2.ObjProbe2",
-      "entry": "objprobe2.ObjProbe2"
-    },
-    {
-      "name": "ContainerDemo",
-      "desc": "源码容器演示: 每10tick输出BBBB, 读me/moving/查询真值",
-      "version": "1.0",
-      "type": "java",
-      "path": "src/ContainerDemo.java",
-      "sha256": "e237a693601778fa194f075a60cc4d932de22ee3797cad159217738b8615d23e"
-    }
-  ],
+  "description": "云端脚本仓库：当前已清空；APK 内置源码容器从云端加载 .java 源码",
+  "scripts": [],
   "offsets": {
     "242": "offsets/242.json",
     "default": "offsets/242.json"
