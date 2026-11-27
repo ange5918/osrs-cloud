@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    site 项目一键打包上传
+      IDEA 打开本目录, Maven 面板双击 Lifecycle 的 package:
+        sources/MyPlugin.java 编译 dex, 更新 manifest.json, git commit, push gh-pages
+      自定义提交信息: mvn package -Dcloud.msg="myplugin 修复攻击"
+      只构建不推送: 命令行 python deploy.py 加 no-push 参数
+      不依赖 Maven 时直接运行 python deploy.py
+  -->
+  <groupId>local.ghost</groupId>
+  <artifactId>site-cloud</artifactId>
+  <version>1.0</version>
+  <packaging>pom</packaging>
+  <name>myplugin one-click dex build and cloud deploy</name>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <site.dir>${project.basedir}</site.dir>
+    <deploy.py>${site.dir}/deploy.py</deploy.py>
+    <python.exe>python</python.exe>
+    <cloud.msg>myplugin: maven deploy</cloud.msg>
+    <deploy.args>-m ${cloud.msg}</deploy.args>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>cloud-deploy</id>
+            <phase>package</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <echo message="[cloud] one-click: MyPlugin.java to dex to manifest to git push gh-pages"/>
+                <exec executable="${python.exe}" dir="${site.dir}" failonerror="true">
+                  <arg value="${deploy.py}"/>
+                  <arg line="${deploy.args}"/>
+                </exec>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- -Dcloud.skipPush=true 时把参数换成 no-push 参数 -->
+  <profiles>
+    <profile>
+      <id>skip-push</id>
+      <activation><property><name>cloud.skipPush</name></property></activation>
+      <properties>
+        <deploy.args>-m ${cloud.msg} --no-push</deploy.args>
+      </properties>
+    </profile>
+  </profiles>
+</project>
