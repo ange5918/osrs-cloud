@@ -117,7 +117,7 @@ public final class MyPlugin implements Plugin {
 
         // ---- 不在鸡区：命令 APK 朝目标走一步；走几步、何时停由脚本决定 ----
         if (!inMine(x, y)) {
-            GhostCommand.walkTo(GOAL_X, GOAL_Y, GOAL_P);
+            GhostCommand.walk_once(GOAL_X, GOAL_Y, GOAL_P);
             return;
         }
 
@@ -162,7 +162,7 @@ public final class MyPlugin implements Plugin {
 
         // ---- 命令3：让 APK 立刻发交互包 ----
         String name = near.optString("name", "Chicken");
-        String r = GhostCommand.npcInteract(name, "Attack");
+        String r = GhostCommand.npc_option(name, "Attack");
         log("dddd ：" + name + " @ " + nx + "," + ny + " -> " + r);
         restLeft = 4;
     }
