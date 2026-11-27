@@ -12,7 +12,6 @@ import com.ghost.api.skills.Combat;
 import com.ghost.api.skills.Skill;
 import com.ghost.api.skills.Skills;
 import com.ghost.api.widgets.Dialog;
-import java.util.List;
 import java.util.Optional;
 
 public final class MyPlugin extends LoopedPlugin {
@@ -53,17 +52,10 @@ public final class MyPlugin extends LoopedPlugin {
             && c.y() >= minY && c.y() < minY + p.height();
     }
 
-    private static double distSq(Coord a, Coord b) {
-        if (a.floor() != b.floor()) return Double.MAX_VALUE;
-        double dx = a.x() - b.x();
-        double dy = a.y() - b.y();
-        return dx * dx + dy * dy;
-    }
-
     @Override public void onLoop() {
         tick++;
         Optional<Player> meOpt = Players.getLocal();
-        if (!meOpt.isPresent()) {
+        if (meOpt.isEmpty()) {
             if (tick <= 3 || tick % 60 == 0) {
                 log("[诊断 tick=" + tick + "] 未获取到本地玩家（账号未登录/桥未连上/切片未就绪），跳过本轮");
             }
@@ -102,34 +94,12 @@ public final class MyPlugin extends LoopedPlugin {
             return;
         }
         if (tick - lastAttackTick < 5) return;
-
-        // 不用 lambda、不用 Optional.isEmpty()：Android9 dex 上会触发 BootstrapMethodError。
-        List<NPC> all = NPCs.getAll();
-        NPC best = null;
-        double bestDist = Double.MAX_VALUE;
-        int named = 0;
-        int inArea = 0;
-        int eligible = 0;
-        for (NPC x : all) {
-            if (x == null) continue;
-            if (!x.name().isPresent()) continue;
-            named++;
-            if (!mine.contains(x.coord())) continue;
-            inArea++;
-            if (x.interacting().isPresent()) continue;
-            if (x.isHealthBarVisible()) continue;
-            eligible++;
-            double d = distSq(here, x.coord());
-            if (d < bestDist) {
-                bestDist = d;
-                best = x;
-            }
-        }
-        if (best != null) {
-            log("aa : " + best.name() + " ," + best.isMoving() + " ,idx=" + best.index() + " ,dist2=" + (long) bestDist);
-            best.interact("Attack");
-        } else if (tick % 20 == 0) {
-            log("[扫描] NPC总数=" + all.size() + " 有名=" + named + " 区内=" + inArea + " 符合=" + eligible);
+        NPC npc = NPCs.getNearest(x->x.name().isPresent()&&x.interacting().isEmpty()
+        &&!x.isHealthBarVisible()&&mine.contains(x.coord())
+        ).orElse(null);
+        if (npc!=null){
+            log("aa : "+npc.name()+" ,"+npc.isMoving());
+            npc.interact("Attack");
         }
         lastAttackTick = tick;
     }

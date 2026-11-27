@@ -1,17 +1,17 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 28,
+  "version": 29,
   "updated": "2026-11-28",
-  "description": "修复 lambda 引导失败：无 lambda/无 Optional.isEmpty，保留 aa 日志并加扫描诊断",
+  "description": "恢复用户原始 Java；设备端改用 D8 desugar 支持 lambda",
   "scripts": [
     {
       "name": "myplugin",
       "display": "MyPlugin",
-      "desc": "MyPlugin 杀鸡脚本(无lambda/无isEmpty，aa日志+扫描诊断)",
-      "version": "3.6",
+      "desc": "MyPlugin 杀鸡脚本(用户原始源码: lambda + Attack)",
+      "version": "3.5",
       "type": "java",
       "path": "src/myplugin.java",
-      "sha256": "8214c06395ffb7ce790b5e1cedf6631893ec5eed0f4e3a0f51fb60011652d6cf"
+      "sha256": "404e49c6ce9064609438def1471fc2030bcbe87f14f84a8e4a618dff7045f8ff"
     }
   ],
   "offsets": {
