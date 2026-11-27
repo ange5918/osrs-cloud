@@ -1,11 +1,12 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 24,
+  "version": 25,
   "updated": "2026-11-27",
-  "description": "设备端编译仓库: 修复 Android9 兼容(isEmpty/lambda), public class MyPlugin, 无invokedynamic",
+  "description": "PowBot式脚本列表: 显示 MyPlugin, 首次编译后缓存 dex, 再次点名直接启动",
   "scripts": [
     {
       "name": "myplugin",
+      "display": "MyPlugin",
       "desc": "MyPlugin 杀鸡脚本(Android9兼容终版, 无lambda/Wait/真值门控)",
       "version": "3.3",
       "type": "java",
