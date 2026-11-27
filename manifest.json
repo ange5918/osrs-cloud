@@ -1,8 +1,8 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 12,
+  "version": 13,
   "updated": "2026-11-24",
-  "description": "源码容器仓库：悬浮窗下载 myplugin.java 到本地，游戏内容器执行并调用 ghost api",
+  "description": "源码容器仓库：悬浮窗下载 java 到本地，游戏内容器执行并调用 ghost api",
   "scripts": [
     {
       "name": "myplugin",
