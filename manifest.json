@@ -1,8 +1,8 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 29,
+  "version": 30,
   "updated": "2026-11-28",
-  "description": "恢复用户原始 Java；设备端改用 D8 desugar 支持 lambda",
+  "description": "恢复用户原始 Java（严格 sha 0d67…）；设备端改用 D8 desugar 支持 lambda",
   "scripts": [
     {
       "name": "myplugin",
@@ -11,7 +11,7 @@
       "version": "3.5",
       "type": "java",
       "path": "src/myplugin.java",
-      "sha256": "404e49c6ce9064609438def1471fc2030bcbe87f14f84a8e4a618dff7045f8ff"
+      "sha256": "0d67ea123579ad12ed8c3c389f306771ed9a495b08b034ad8be0d6bf540b6d5a"
     }
   ],
   "offsets": {

@@ -55,7 +55,7 @@ public final class MyPlugin extends LoopedPlugin {
     @Override public void onLoop() {
         tick++;
         Optional<Player> meOpt = Players.getLocal();
-        if (meOpt.isEmpty()) {
+        if (!meOpt.isPresent()) {
             if (tick <= 3 || tick % 60 == 0) {
                 log("[诊断 tick=" + tick + "] 未获取到本地玩家（账号未登录/桥未连上/切片未就绪），跳过本轮");
             }
