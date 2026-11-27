@@ -10,3 +10,6 @@
 .idea/
 *.iml
 lib_ghost_api.jar
+
+# Maven 构建中间产物
+target/
