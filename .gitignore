@@ -6,3 +6,7 @@
 *.tmp
 *.log
 .DS_Store
+# 本地 IDEA 配置(含本机绝对路径)与本地库副本, 不上传云端
+.idea/
+*.iml
+lib_ghost_api.jar
