@@ -10,7 +10,7 @@
       "desc": "MyPlugin 杀鸡脚本(Android9兼容: 无isEmpty/lambda/真值门控)",
       "version": "3.4",
       "type": "java",
-      "path": "src/MyPlugin.java",
+      "path": "src/myplugin.java",
       "sha256": "e1564ee8839d57a21bf1fca3f4dc03f0b9867f063880b2cfcc57e51ed50a6c85"
     }
   ],
