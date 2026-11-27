@@ -2,9 +2,9 @@
 """site 项目一键打包上传: sources/MyPlugin.java -> javac -> d8 -> dex -> manifest.json -> git commit/push gh-pages。
 
 用法(在本文件所在目录):
-    python 一键打包上传.py                 # 构建 + 提交 + 推送
-    python 一键打包上传.py --no-push       # 只构建 + 提交, 不推送
-    python 一键打包上传.py -m "修复攻击"   # 自定义提交信息
+    python deploy.py                 # 构建 + 提交 + 推送
+    python deploy.py --no-push       # 只构建 + 提交, 不推送
+    python deploy.py -m "修复攻击"   # 自定义提交信息
 等价于旧 ghost-plugin/pom.xml 的 mvn package, 但不依赖 Maven。
 """
 import os, sys, subprocess, hashlib

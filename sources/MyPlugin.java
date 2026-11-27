@@ -119,7 +119,7 @@ public final class MyPlugin extends LoopedPlugin {
             resting = false;   // 时间到，往下走
         }
 
-        log("qqqqq : targeting=" + me.isTargetingNpc() + " , moving=" + me.isMoving() + " , idle=" + me.isIdle());
+        log("BBBB : targeting=" + me.isTargetingNpc() + " , moving=" + me.isMoving() + " , idle=" + me.isIdle());
         if (me.isTargetingNpc() || me.isMoving() || !me.isIdle()) {
             return;
         }

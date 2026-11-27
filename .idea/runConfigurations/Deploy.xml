@@ -1,15 +1,23 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration name="一键打包上传" type="ShConfigurationType" factoryName="Shell Script">
-    <option name="SCRIPT_TEXT" value="" />
-    <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
-    <option name="SCRIPT_PATH" value="$PROJECT_DIR$/deploy.bat" />
-    <option name="SCRIPT_OPTIONS" value="" />
-    <option name="INDEPENDENT_SCRIPT_WORKING_DIRECTORY" value="true" />
-    <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-    <option name="INDEPENDENT_INTERPRETER_PATH" value="true" />
-    <option name="INTERPRETER_PATH" value="" />
-    <option name="INTERPRETER_OPTIONS" value="" />
-    <envs />
+  <configuration default="false" name="一键打包上传" type="MavenRunConfiguration" factoryName="Maven" nameIsGenerated="true">
+    <MavenSettings>
+      <option name="myGeneralSettings" />
+      <option name="myRunnerSettings" />
+      <option name="myRunnerParameters">
+        <MavenRunnerParameters>
+          <option name="goals">
+            <list>
+              <option value="package" />
+            </list>
+          </option>
+          <option name="profiles">
+            <set />
+          </option>
+          <option name="workingDirPath" value="$PROJECT_DIR$" />
+          <option name="pomFileName" value="pom.xml" />
+        </MavenRunnerParameters>
+      </option>
+    </MavenSettings>
     <method v="2" />
   </configuration>
 </component>
