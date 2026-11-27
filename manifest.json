@@ -1,17 +1,17 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 26,
+  "version": 27,
   "updated": "2026-11-28",
-  "description": "清空后仅保留 MyPlugin.java；设备端编译 dex 并缓存",
+  "description": "云仓清空后仅保留用户当前 MyPlugin.java",
   "scripts": [
     {
       "name": "myplugin",
       "display": "MyPlugin",
-      "desc": "MyPlugin 杀鸡脚本(Android9兼容: 无isEmpty/lambda/真值门控)",
-      "version": "3.4",
+      "desc": "MyPlugin 杀鸡脚本(用户当前版本: 最近NPC过滤+Attack)",
+      "version": "3.5",
       "type": "java",
       "path": "src/myplugin.java",
-      "sha256": "e1564ee8839d57a21bf1fca3f4dc03f0b9867f063880b2cfcc57e51ed50a6c85"
+      "sha256": "0d67ea123579ad12ed8c3c389f306771ed9a495b08b034ad8be0d6bf540b6d5a"
     }
   ],
   "offsets": {

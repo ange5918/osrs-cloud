@@ -14,17 +14,6 @@ import com.ghost.api.skills.Skills;
 import com.ghost.api.widgets.Dialog;
 import java.util.Optional;
 
-/**
- * Ghost jar 脚本模板 —— 最小可跑的 LoopedPlugin。
- *
- * 写你自己的脚本：照着这个类改 onLoop() 里的逻辑，或复制本文件换个类名/包名。
- * 每一个 ghost jar 脚本必须有三样东西：
- *   1) 继承 LoopedPlugin
- *   2) declare() 声明要读哪些数据切片（不声明就读不到）
- *   3) onLoop() 每 tick(~600ms) 调用一次，写你的状态机
- *
- * 编译/打包/运行见工程根目录的 build.bat 和 README.md。
- */
 public final class MyPlugin extends LoopedPlugin {
 
     // ===== 插件元信息 =====
@@ -33,10 +22,6 @@ public final class MyPlugin extends LoopedPlugin {
     @Override public String description() { return "Ghost jar 脚本模板：打印玩家坐标"; }
     @Override public String version() { return "1.0"; }
 
-    /**
-     * 声明数据切片。需要什么加什么，别全加（多余切片浪费性能）。
-     * 常用：withObjects / withInventory / withSkills / withBank / withReachable
-     */
     @Override public Declaration declare() {
         return Declaration.none()
                 .withObjects()    // → TileObjects 域
@@ -101,37 +86,21 @@ public final class MyPlugin extends LoopedPlugin {
                 Combat.setAttackStyle(want);
             }
         }
-
         log("FFF : targeting=" + me.isTargetingNpc() + " , moving=" + me.isMoving() + " , idle=" + me.isIdle());
-
         Place mine = placeFromBottomLeft("杀鸡", new Coord(3173, 3289, 0), 12, 15);
         if (!mine.contains(here)) {
             if (tick % 20 == 0) log("走回鸡区 " + here + " -> " + mine.centre());
             walkto(mine.centre());
             return;
         }
-
-        // 攻击节流: 每 5 tick 才找一次鸡 (约 3 秒, 等价原 Wait.ticks(4,5))
         if (tick - lastAttackTick < 5) return;
-
-        // 遍历找最近的鸡 (不用 lambda, 避免 invokedynamic bootstrap 失败)
-        NPC best = null;
-        int bestDist = Integer.MAX_VALUE;
-        for (NPC n : NPCs.getAll()) {
-            if (n == null) continue;
-            String nm = n.name().orElse("");
-            if (nm.toLowerCase().indexOf("chicken") < 0) continue;
-            Coord c = n.coord();
-            if (!mine.contains(c)) continue;
-            int d = Math.abs(c.x() - here.x()) + Math.abs(c.y() - here.y());
-            if (d < bestDist) { bestDist = d; best = n; }
+        NPC npc = NPCs.getNearest(x->x.name().isPresent()&&x.interacting().isEmpty()
+        &&!x.isHealthBarVisible()&&mine.contains(x.coord())
+        ).orElse(null);
+        if (npc!=null){
+            log("aa : "+npc.name()+" ,"+npc.isMoving());
+            npc.interact("Attack");
         }
-        if (best == null) {
-            if (tick % 10 == 0) log("鸡区内暂无可攻击的鸡");
-            return;
-        }
-        log("dddd  ：" + best.name().orElse("?") + " idx=" + best.index() + " dist=" + bestDist);
-        best.attack();
         lastAttackTick = tick;
     }
 
