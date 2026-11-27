@@ -86,7 +86,7 @@ public final class MyPlugin extends LoopedPlugin {
                 Combat.setAttackStyle(want);
             }
         }
-        log("FFF : targeting=" + me.isTargetingNpc() + " , moving=" + me.isMoving() + " , idle=" + me.isIdle());
+        log("FFF : targeting=" + me.attack() + " , moving=" + me.isMoving() + " , idle=" + me.isIdle());
         Place mine = placeFromBottomLeft("杀鸡", new Coord(3173, 3289, 0), 12, 15);
         if (!mine.contains(here)) {
             if (tick % 20 == 0) log("走回鸡区 " + here + " -> " + mine.centre());
