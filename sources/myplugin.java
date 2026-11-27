@@ -142,10 +142,19 @@ public final class MyPlugin implements Plugin {
         else stuckTicks = 0;
         lastX = x; lastY = y;
 
+        // ★243.1 真值诊断: 经 GhostCommand.query_truth 读 native 内存 (仅低频打印)
+        String truthDiag = "";
+        if (loops % 30 == 0) {
+            try {
+                JSONObject tt = new JSONObject(GhostCommand.query_truth("TICK"));
+                JSONObject ti = new JSONObject(GhostCommand.query_truth("F_INTERACTING"));
+                truthDiag = " , TICK=" + tt.optInt("value") + " , F_INTERACTING=" + ti.optInt("value");
+            } catch (Throwable e) { truthDiag = " , query_truth ERR=" + e; }
+        }
         log("qqqqq : targeting=" + me.optBoolean("interacting")
                 + " , moving=" + me.optBoolean("moving")
                 + " , idle=" + me.optBoolean("idle")
-                + " , stuck=" + stuckTicks + " , here=" + x + "," + y);
+                + " , stuck=" + stuckTicks + " , here=" + x + "," + y + truthDiag);
 
         if (me.optBoolean("interacting") || me.optBoolean("moving") || !me.optBoolean("idle")) return;
 
