@@ -1,16 +1,16 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 19,
+  "version": 21,
   "updated": "2026-11-24",
-  "description": "源码容器仓库：悬浮窗下载 java 到本地，游戏内 eval class 并每 tick 调 onLoop()",
+  "description": "设备端编译仓库：悬浮窗下载 java，手机本地 ecj+dx 编译成 dex，容器内 onLoop 每 tick 循环",
   "scripts": [
     {
       "name": "myplugin",
-      "desc": "MyPlugin 杀鸡脚本(class式/Object承接版): 悬浮窗下载java -> 容器eval -> 每tick调onLoop()",
-      "version": "2.1",
+      "desc": "MyPlugin 杀鸡脚本(标准LoopedPlugin): 悬浮窗下载java->手机编译dex->onLoop每tick",
+      "version": "3.0",
       "type": "java",
-      "path": "src/myplugin_v21.java",
-      "sha256": "3a81fa4116ed125d676eabf0f4333d045ceac90b8f37c0cb05a4f294b500295c"
+      "path": "src/myplugin_v30.java",
+      "sha256": "c29a687d20fb86e31e591d557258ec0d91c529a23cafb4e4697937254d967466"
     }
   ],
   "offsets": {

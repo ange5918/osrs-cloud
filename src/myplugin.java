@@ -1,125 +1,83 @@
-// @desc MyPlugin 杀鸡脚本(class 式): 坐标框内找鸡→Attack, 攻击后休息, 卡住重走
-// @version 2.1
-// 悬浮窗下载本文件 -> 游戏内容器 eval -> 每 tick 调 MyPlugin.onLoop()
-// 容器内 dex 类型一律用 Object 承接(BeanShell 在 Android 不能解析具体 dex 类型字段),
-// 方法靠动态反射调用, 逻辑不变。
+package myplugin;
 
-class MyPlugin {
-    int tickLocal = 0;
-    boolean resting = false;
-    int restLeft = 0;
-    Object lastPos = null;
-    int stuckTicks = 0;
+import com.ghost.api.Declaration;
+import com.ghost.api.Kind;
+import com.ghost.api.LoopedPlugin;
+import com.ghost.api.entities.NPC;
+import com.ghost.api.entities.NPCs;
+import com.ghost.api.entities.Player;
+import com.ghost.api.entities.Players;
+import com.ghost.api.movement.Coord;
+import com.ghost.api.movement.Walker;
 
-    // 杀鸡区域：左下角 (3173,3289,0)，宽 12 高 15
-    int MINE_MINX = 3173;
-    int MINE_MAXX = 3173 + 12 - 1;
-    int MINE_MINY = 3289;
-    int MINE_MAXY = 3289 + 15 - 1;
-    int MINE_PLANE = 0;
+/**
+ * MyPlugin —— 标准 Ghost 插件（class 式，设备端编译成 dex 运行）。
+ * 杀鸡区域：左下角 (3173,3289,0)，宽 12 高 15。
+ * 悬浮窗下载本文件 -> 手机端 ecj+dx 编译成 dex -> 容器每 tick 调 onLoop()。
+ */
+final class myplugin extends LoopedPlugin {
 
-    public boolean inMine(int x, int y, int plane) {
-        return plane == MINE_PLANE && x >= MINE_MINX && x <= MINE_MAXX
-                && y >= MINE_MINY && y <= MINE_MAXY;
+    @Override public Kind kind() { return Kind.MAIN; }
+    @Override public String name() { return "myplugin"; }
+    @Override public String description() { return "杀鸡脚本(设备端编译 dex 版)"; }
+    @Override public String version() { return "3.0"; }
+
+    @Override public Declaration declare() {
+        return Declaration.none().withNpcs().withWorld().withVars();
     }
 
-    public void onLoop() {
-        tickLocal = tickLocal + 1;
+    private static final int MINX = 3173, MINY = 3289, MAXX = 3184, MAXY = 3303, PLANE = 0;
+    private int tick = 0;
 
-        String p = api.me();
-        if (p == null || p.length() == 0) {
-            if (tickLocal <= 3 || tickLocal % 60 == 0) log("[诊断] 未获取到本地坐标，跳过");
+    private boolean inMine(Coord c) {
+        return c != null && c.floor() == PLANE && c.x() >= MINX && c.x() <= MAXX
+                && c.y() >= MINY && c.y() <= MAXY;
+    }
+
+    @Override public void onLoop() {
+        tick++;
+        // BBBB 心跳: 每 10 tick 无条件输出一次, 证明 onLoop 在循环
+        if (tick % 10 == 0) log("BBBB : tick=" + tick);
+
+        java.util.Optional<Player> meOpt = Players.getLocal();
+        if (!meOpt.isPresent()) {
+            if (tick <= 3 || tick % 60 == 0) log("未获取到本地玩家，跳过 tick=" + tick);
             return;
         }
-        String[] pp = p.split(",");
-        int px = Integer.parseInt(pp[0].trim());
-        int py = Integer.parseInt(pp[1].trim());
-        int plane = pp.length > 2 ? Integer.parseInt(pp[2].trim()) : 0;
+        Player me = meOpt.get();
+        Coord here = me.coord();
 
-        boolean moving = api.moving();
-        int interacting = api.query("F_INTERACTING");
-        int idle = api.query("F_IDLE");
-
-        // 每 10 tick 无条件输出真值
-        if (tickLocal % 10 == 0) {
-            log("BBBB : targeting=" + (interacting > 0) + " , moving=" + moving
-                + " , idle=" + (idle > 0) + " , me=" + p + " , t=" + tickLocal);
-        }
-
-        // 休息中
-        if (resting) {
-            restLeft = restLeft - 1;
-            if (restLeft > 0) return;
-            resting = false;
-        }
-
-        // 卡住检测(Object 动态调 getX/getY)
-        if (lastPos != null && ((Integer) invoke(lastPos, "getX")) == px
-                && ((Integer) invoke(lastPos, "getY")) == py && moving) {
-            stuckTicks = stuckTicks + 1;
-        } else {
-            stuckTicks = 0;
-        }
-        try { lastPos = client.getLocalPlayerLocation(); } catch (Throwable ignore) { }
-
-        // 正在攻击/移动/非空闲 → 不抢操作
-        if (interacting > 0 || moving || idle == 0) return;
-
-        if (!inMine(px, py, plane)) {
-            if (tickLocal % 5 == 0) {
-                log("走回鸡区 me=" + p + " -> 3179,3296 stuck=" + stuckTicks);
-                api.walk_once(3179, 3296, plane);
-            }
+        // 不在鸡区: 走回去
+        if (!inMine(here)) {
+            if (tick % 20 == 0) log("走回鸡区 " + here + " -> 3179,3296");
+            Walker.walkTo(3179, 3296, PLANE);
             return;
         }
 
-        Object best = null;
-        int bestDist = 999999;
-        try {
-            java.util.List npcs = client.getNpcs();
-            for (int i = 0; i < npcs.size(); i++) {
-                Object n = npcs.get(i);
-                if (n == null) continue;
-                String nm = (String) invoke(n, "getName");
-                if (nm == null || !nm.contains("Chicken")) continue;
-                Object loc = invoke(n, "getWorldLocation");
-                if (loc == null) continue;
-                int lx = ((Integer) invoke(loc, "getX")).intValue();
-                int ly = ((Integer) invoke(loc, "getY")).intValue();
-                int lp = ((Integer) invoke(loc, "getPlane")).intValue();
-                if (!inMine(lx, ly, lp)) continue;
-                int d = Math.abs(lx - px) + Math.abs(ly - py);
-                if (d < bestDist) { bestDist = d; best = n; }
-            }
-        } catch (Throwable t) {
-            log("扫描 NPC 异常: " + t);
+        // 框内找最近的鸡
+        NPC best = null;
+        int bestDist = Integer.MAX_VALUE;
+        for (NPC n : NPCs.getAll()) {
+            if (n == null) continue;
+            String nm = n.name().orElse("");
+            if (nm.toLowerCase().indexOf("chicken") < 0) continue;
+            Coord c = n.coord();
+            if (!inMine(c)) continue;
+            int d = Math.abs(c.x() - here.x()) + Math.abs(c.y() - here.y());
+            if (d < bestDist) { bestDist = d; best = n; }
         }
-
-        if (best != null) {
-            String nm = (String) invoke(best, "getName");
-            Object loc = invoke(best, "getWorldLocation");
-            int bx = ((Integer) invoke(loc, "getX")).intValue();
-            int by = ((Integer) invoke(loc, "getY")).intValue();
-            int idx = ((Integer) invoke(best, "getIndex")).intValue();
-            log("Attack " + nm + " @" + bx + "," + by + " idx=" + idx + " dist=" + bestDist);
-            api.npc_option(nm, "Attack");
-            resting = true;
-            restLeft = 4 + (int)(Math.random() * 2);
-        } else {
-            if (tickLocal % 10 == 0) log("鸡区内暂无可攻击的鸡，等待… stuck=" + stuckTicks);
+        if (best == null) {
+            if (tick % 10 == 0) log("鸡区内暂无可攻击的鸡");
+            return;
         }
+        if (tick % 10 == 0 || tick % 3 == 0) {
+            log("Attack " + best.name().orElse("?") + " idx=" + best.index() + " dist=" + bestDist);
+        }
+        // 高层 API 攻击
+        best.attack();
     }
 
-    // 反射调用, 规避 BeanShell 对 dex 具体类型的静态解析
-    Object invoke(Object obj, String method) {
-        try {
-            return obj.getClass().getMethod(method).invoke(obj);
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
-    public void onStop() {
-        log("MyPlugin 已停止，共运行 " + tickLocal + " tick");
+    @Override public void onStop() {
+        log("MyPlugin 已停止，共运行 " + tick + " tick");
     }
 }
