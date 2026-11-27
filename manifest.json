@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 7,
+  "version": 8,
   "updated": "2026-11-24",
   "description": "云端脚本仓库：type=dex 的脚本由 .java 经 javac+d8 编译，APK 用 DexClassLoader 动态加载",
   "scripts": [
@@ -63,6 +63,14 @@
       "sha256": "365030444c0eecb7fe1cdcd37826aaf11528278e0ac08e2f47a9b5190fab6b3f",
       "class": "objprobe2.ObjProbe2",
       "entry": "objprobe2.ObjProbe2"
+    },
+    {
+      "name": "ContainerDemo",
+      "desc": "源码容器演示: 每10tick输出BBBB, 读me/moving/查询真值",
+      "version": "1.0",
+      "type": "java",
+      "path": "src/ContainerDemo.java",
+      "sha256": "e237a693601778fa194f075a60cc4d932de22ee3797cad159217738b8615d23e"
     }
   ],
   "offsets": {
