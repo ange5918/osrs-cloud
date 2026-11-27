@@ -5,71 +5,55 @@ import com.astrastudio.api.annotation.PluginDescriptor;
 import com.astrastudio.api.annotation.Subscribe;
 import com.astrastudio.api.event.GameTick;
 
-import com.ghost.api.entities.NPC;
-import com.ghost.api.entities.Player;
-import com.ghost.api.entities.Players;
-import com.ghost.api.entities.NPCs;
-import com.ghost.api.movement.Coord;
-import com.ghost.api.movement.Place;
-import com.ghost.api.movement.Walker;
+import com.ghost.api.cmd.GhostCommand;
 import com.ghost.api.skills.Combat;
 import com.ghost.api.skills.Skill;
 import com.ghost.api.skills.Skills;
 import com.ghost.api.widgets.Dialog;
 
-import com.astrastudio.api.model.Client;
-import com.astrastudio.api.model.WorldPoint;
-
-import java.util.Optional;
-import java.util.function.Predicate;
+import org.json.JSONObject;
 
 /**
- * MyPlugin —— 杀鸡脚本（AstraStudio Plugin 骨架，云端加载器可加载）。
+ * MyPlugin —— 杀鸡脚本（决策全在脚本，APK ghost 只执行/查询）。
  *
- * 之前版本继承 com.ghost.api.LoopedPlugin（实现 ghost 包的 Plugin），
- * 而云端加载器 PluginManager 要求 com.astrastudio.api.Plugin + @PluginDescriptor，
- * 接口包名不同 -> 被"框架拒绝加载"，脚本从未运行，自然走不到鸡区。
- * 本版改成 implements com.astrastudio.api.Plugin + @PluginDescriptor + @Subscribe GameTick，
- * 与已验证可加载的 fish.Fish 同构；寻路改用 APK 内 OfficialNav（真跨区寻路）。
+ * 架构：
+ *   myplugin onTick  = 自己查询真值、自己判断在不在鸡区、自己选鸡、自己决定攻击节奏；
+ *   APK GhostCommand = 收到一条命令才查一次数据或发一次包，不自设目标、不自开 tick。
  *
  * 启停: echo stop  > /data/local/tmp/myplugin.txt  停 / echo start 启 / echo stat 状态
- * 日志: adb logcat -d -s System.out:I | grep -E "MyPlugin|qqqqq|dddd"
+ * 日志: adb logcat -d -s System.out:I | grep -E "MyPlugin|GhostCMD"
  */
 @PluginDescriptor(
         name = "MyPlugin(杀鸡)",
-        description = "Ghost API 真值门面 + 官方 astar3 寻路：走到鸡区 → 找 Chicken → Attack",
-        tags = {"战斗", "Ghost API", "官方寻路"},
+        description = "脚本自主决策 + APK GhostCommand 查询/发包：走到鸡区 → 找 Chicken → Attack",
+        tags = {"战斗", "Ghost API", "命令层"},
         enabledByDefault = true
 )
 public final class MyPlugin implements Plugin {
     private PluginContext ctx;
-    private Client client;
-    // 寻路走 APK 门面 Walker.walkTo -> AutoNavPlugin(NavBot 2.83 完整寻路)
 
     private static final String CMD_FILE = "/data/local/tmp/myplugin.txt";
-    private static final int EVERY = 30;   // 20ms/tick -> 约600ms, 对齐 Ghost onLoop
-    private static final int MINE_X = 3178, MINE_Y = 3296, MINE_PLANE = 0;
+    private static final int EVERY = 30;
+    private static final int MINE_X1 = 3173, MINE_Y1 = 3289;
+    private static final int MINE_X2 = 3184, MINE_Y2 = 3303;
+    private static final int GOAL_X = 3178, GOAL_Y = 3296, GOAL_P = 0;
 
     private long loops = 0;
     private boolean active = true;
     private String lastCmd = "";
     private int poll = 0;
     private int restLeft = 0;
-    private long lastDirectWalk = -1;
-    private Coord lastPos = null;
+    private int lastX = -1, lastY = -1;
     private int stuckTicks = 0;
 
     @Override
     public void configure(PluginContext context) {
         this.ctx = context;
-        this.client = context.getClient();
     }
 
     @Override
     public void startUp() {
         log("启动。启停: echo stop > " + CMD_FILE + " 停 / echo start 启 / echo stat 状态");
-        // ★整套移植: 寻路交给 APK 常驻 AutoNavPlugin, 这里不再自建寻路器。
-        //   到鸡区的目标在 onTick 里用 Walker.walkTo(MINE_X,MINE_Y) 设置(幂等)。
     }
 
     @Override
@@ -97,7 +81,7 @@ public final class MyPlugin implements Plugin {
                 log("状态: " + (active ? "运行中" : "已停") + ", tick=" + loops);
             }
         } catch (java.io.FileNotFoundException e) {
-            // 无指令文件, 静默
+            // 无指令文件，静默
         } catch (Exception e) {
             log("读指令异常: " + e);
         }
@@ -107,34 +91,37 @@ public final class MyPlugin implements Plugin {
         ctx.log("[MyPlugin] " + s);
     }
 
+    private static boolean inMine(int x, int y) {
+        return x >= MINE_X1 && x <= MINE_X2 && y >= MINE_Y1 && y <= MINE_Y2;
+    }
+
     @Subscribe
     public void onTick(GameTick tick) {
         pollCommand();
         if (!active) return;
 
-        Optional<Player> meOpt = Players.getLocal();
-        if (!meOpt.isPresent()) {
-            if (loops <= 3 || loops % 60 == 0) {
-                log("[诊断] 未获取到本地玩家(账号未登录/桥未连上/切片未就绪), 跳过本轮");
-            }
+        // ---- 命令1：查玩家真值（APK 只返回信息，不做决策） ----
+        JSONObject me;
+        try {
+            me = new JSONObject(GhostCommand.player());
+        } catch (Throwable e) {
+            if (loops <= 3 || loops % 60 == 0) log("[诊断] player 命令异常: " + e);
             return;
         }
-        Player me = meOpt.get();
-        Coord here = me.coord();
-        if (here == null) return;
+        if (!me.optBoolean("ok", false)) {
+            if (loops <= 3 || loops % 60 == 0) log("[诊断] 未获取到本地玩家: " + me.optString("error"));
+            return;
+        }
+        int x = me.optInt("x"), y = me.optInt("y"), plane = me.optInt("plane");
         loops++;
 
-        final Place mine = Place.fromCorners("杀鸡",
-                new Coord(3173, 3289, 0), new Coord(3184, 3303, 0));
-
-        // ===== 不在鸡区：官方 astar3 寻路走过去 =====
-        if (!mine.contains(here)) {
-            // ★本脚本 onTick 每 tick 调门面 -> NavBot.step() 推进一步(APK 内无常驻 onTick)。
-            Walker.walkTo(MINE_X, MINE_Y, MINE_PLANE);
+        // ---- 不在鸡区：命令 APK 朝目标走一步；走几步、何时停由脚本决定 ----
+        if (!inMine(x, y)) {
+            GhostCommand.walkTo(GOAL_X, GOAL_Y, GOAL_P);
             return;
         }
 
-        // ===== 已在鸡区：杀鸡流程 =====
+        // ---- 已在鸡区：脚本自己的战斗节奏 ----
         if (tick.getTick() % EVERY != 0) return;
         if (restLeft > 0) { restLeft--; return; }
 
@@ -144,41 +131,40 @@ public final class MyPlugin implements Plugin {
             int strength = Skills.getLevel(Skill.STRENGTH);
             int defence = Skills.getLevel(Skill.DEFENCE);
             int want;
-            if (attack <= strength || attack <= defence) {
-                want = 0;
-            } else if (strength <= defence) {
-                want = 1;
-            } else {
-                want = 3;
-            }
+            if (attack <= strength || attack <= defence) want = 0;
+            else if (strength <= defence) want = 1;
+            else want = 3;
             if (Dialog.isOpen()) continueDialog();
             if (style != want) Combat.setAttackStyle(want);
         }
 
-        if (lastPos != null && here.x() == lastPos.x() && here.y() == lastPos.y()
-                && Walker.isWalking()) stuckTicks++;
+        if (x == lastX && y == lastY && me.optBoolean("moving", false)) stuckTicks++;
         else stuckTicks = 0;
-        lastPos = here;
+        lastX = x; lastY = y;
 
-        log("qqqqq : targeting=" + me.isTargetingNpc() + " , moving=" + me.isMoving()
-                + " , idle=" + me.isIdle() + " , stuck=" + stuckTicks + " , here=" + here);
-        if (me.isTargetingNpc() || me.isMoving() || !me.isIdle()) return;
+        log("qqqqq : targeting=" + me.optBoolean("interacting")
+                + " , moving=" + me.optBoolean("moving")
+                + " , idle=" + me.optBoolean("idle")
+                + " , stuck=" + stuckTicks + " , here=" + x + "," + y);
 
-        Optional<NPC> target = NPCs.getNearest(new Predicate<NPC>() {
-            @Override public boolean test(NPC n) {
-                return n != null
-                        && n.name().isPresent()
-                        && n.name().get().contains("Chicken")
-                        && n.coord() != null
-                        && mine.contains(n.coord());
-            }
-        });
-        if (target.isPresent()) {
-            NPC t = target.get();
-            log("dddd ：" + t.name().orElse("Chicken") + " @ " + t.coord());
-            t.interact("Attack");
-            restLeft = 4;
+        if (me.optBoolean("interacting") || me.optBoolean("moving") || !me.optBoolean("idle")) return;
+
+        // ---- 命令2：查 NPC 真值；脚本自己筛选目标鸡 ----
+        JSONObject near;
+        try {
+            near = new JSONObject(GhostCommand.npcNearest("Chicken"));
+        } catch (Throwable e) {
+            return;
         }
+        if (!near.optBoolean("ok", false)) return;
+        int nx = near.optInt("x", -1), ny = near.optInt("y", -1);
+        if (!inMine(nx, ny)) return;
+
+        // ---- 命令3：让 APK 立刻发交互包 ----
+        String name = near.optString("name", "Chicken");
+        String r = GhostCommand.npcInteract(name, "Attack");
+        log("dddd ：" + name + " @ " + nx + "," + ny + " -> " + r);
+        restLeft = 4;
     }
 
     private void continueDialog() {
