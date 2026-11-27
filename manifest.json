@@ -1,9 +1,18 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 10,
+  "version": 11,
   "updated": "2026-11-24",
-  "description": "云端脚本仓库：已清空；APK 内置 java 源码容器就绪，选脚本即下载源码并调用 ghost api",
-  "scripts": [],
+  "description": "源码容器仓库：悬浮窗下载 java 到本地，游戏内容器执行并调用 ghost api",
+  "scripts": [
+    {
+      "name": "ContainerDemo",
+      "desc": "源码容器演示: 每10tick输出BBBB, 读me/moving/查询真值",
+      "version": "1.0",
+      "type": "java",
+      "path": "src/ContainerDemo.java",
+      "sha256": "e237a693601778fa194f075a60cc4d932de22ee3797cad159217738b8615d23e"
+    }
+  ],
   "offsets": {
     "242": "offsets/242.json",
     "default": "offsets/242.json"
