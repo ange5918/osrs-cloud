@@ -99,6 +99,7 @@ public final class MyPlugin implements Plugin {
     public void onTick(GameTick tick) {
         pollCommand();
         if (!active) return;
+        loops++;
 
         // ---- 命令1：查玩家真值（APK 只返回信息，不做决策） ----
         JSONObject me;
@@ -113,7 +114,6 @@ public final class MyPlugin implements Plugin {
             return;
         }
         int x = me.optInt("x"), y = me.optInt("y"), plane = me.optInt("plane");
-        loops++;
 
         // ---- 不在鸡区：命令 APK 朝目标走一步；走几步、何时停由脚本决定 ----
         if (!inMine(x, y)) {
