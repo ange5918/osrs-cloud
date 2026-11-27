@@ -7,7 +7,7 @@
         <MavenRunnerParameters>
           <option name="goals">
             <list>
-              <option value="package" />
+              <option value="package -Dcloud.skipPush=true" />
             </list>
           </option>
           <option name="profiles">
@@ -15,7 +15,6 @@
           </option>
           <option name="workingDirPath" value="$PROJECT_DIR$" />
           <option name="pomFileName" value="pom.xml" />
-          <option name="vmOptions" value="-Dcloud.skipPush=true" />
         </MavenRunnerParameters>
       </option>
     </MavenSettings>
