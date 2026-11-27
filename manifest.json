@@ -1,6 +1,6 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 13,
+  "version": 14,
   "updated": "2026-11-24",
   "description": "源码容器仓库：悬浮窗下载 java 到本地，游戏内容器执行并调用 ghost api",
   "scripts": [
@@ -10,7 +10,7 @@
       "version": "1.0",
       "type": "java",
       "path": "src/myplugin.java",
-      "sha256": "743bcd31e8537817f83a43c4e427ef98cf0982e707baba9404952258a458526c"
+      "sha256": "033f69dae2e039a0fb544adcf5dc7c71a47cae4a6e2e2c4b5aadb54abbc6d004"
     }
   ],
   "offsets": {

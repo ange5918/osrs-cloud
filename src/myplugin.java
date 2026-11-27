@@ -46,6 +46,12 @@ void onTick() {
     int interacting = api.query("F_INTERACTING");   // 正在攻击为真
     int idle = api.query("F_IDLE");
 
+    // 诊断：无条件每 10 tick 输出真值（之前写在攻击分支里，空闲时永远打不出来）
+    if (tickLocal % 10 == 0) {
+        log("BBBB : targeting=" + (interacting > 0) + " , moving=" + moving
+            + " , idle=" + (idle > 0) + " , me=" + p + " , t=" + tickLocal);
+    }
+
     // 休息中：每 tick 递减，没到时间不找下一只
     if (resting) {
         restLeft = restLeft - 1;
@@ -61,12 +67,8 @@ void onTick() {
     }
     try { lastPos = client.getLocalPlayerLocation(); } catch (Throwable ignore) { }
 
-    // 正在攻击/移动/非空闲 → 不抢操作
+    // 正在攻击/移动/非空闲 → 不抢操作（BBBB 已上移为无条件输出）
     if (interacting > 0 || moving || idle == 0) {
-        if (tickLocal % 10 == 0) {
-            log("BBBB : targeting=" + (interacting > 0) + " , moving=" + moving
-                + " , idle=" + (idle > 0) + " , me=" + p + " , t=" + tickLocal);
-        }
         return;
     }
 
