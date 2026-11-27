@@ -4100,6 +4100,8 @@ public final class NavBot implements Plugin {
     private static final int STUCK_TAPS=6;   // 官方 nav.STUCK_TAPS=5, 端上tick较慢留一档余量
     private static final long DOOR_FIRE_GRACE_MS=900;
     private boolean finished=false,reachedL2=false;
+    // ★整套移植APK: 外部(myplugin)指定单一目标模式, 到目标即停(跳过写死L2->GE2两段式)
+    private boolean singleGoalMode=false;
 
     // ===== ★PC Ghost opener 1:1 移植 (OfficialNav.tryOpenObstacle) =====
     // 障碍全是 object(门/闸/梯子), 靠"路径 cost=2 边定位 + 现场 object name/actions 白名单"验证,
@@ -4222,6 +4224,16 @@ public final class NavBot implements Plugin {
         legStartTick=client.getTickCount();
         ctx.log("[实时导航] ★目标 "+n+" ("+x+","+y+",p"+p+")");
     }
+    /** ★整套移植APK: myplugin 调用的公共入口。已确认 configure()+startUp() 跑过后调用本方法指定目标。
+     *  设 singleGoalMode=true -> 到目标即 finished, 不再切 L2/GE2 两段式。 */
+    public void navTo(int x,int y,int p,String n){
+        singleGoalMode=true; reachedL2=true; finished=false;
+        setGoal(x,y,p,n);
+    }
+    /** ★供 myplugin 手动驱动本导航器一个 tick (NavBot 原生是 @Subscribe 事件驱动, APK 内 myplugin 手动调)。 */
+    public void driveTick(GameTick tick){ onTick(tick); }
+    public boolean isFinished(){ return finished; }
+    public String goalName(){ return goalName; }
     private static long key(int x,int y,int p){return ((long)x<<24)|((long)y<<2)|p;}
     // ★PC官方 cmap.impassable 时效语义: until>now 才算障碍; 到期单个失效(held.clear 同款)。
     private boolean isBlockedNow(long tileKey){
@@ -4342,6 +4354,7 @@ public final class NavBot implements Plugin {
         long t=client.getTickCount();
 
         if((Math.abs(me.getX()-goalX)<=1&&Math.abs(me.getY()-goalY)<=1&&me.getPlane()==goalP)){
+            if(singleGoalMode){ctx.log("[实时导航] ★★★★到达目标 "+goalName+" "+me);finished=true;return;}
             if(!reachedL2){ctx.log("[实时导航] ★★★到达 L2 "+me+" → GE2");reachedL2=true;setGoal(3203,3473,2,"GE2");return;}
             ctx.log("[实时导航] ★★★★到达终点 GE2 "+me);finished=true;return;
         }

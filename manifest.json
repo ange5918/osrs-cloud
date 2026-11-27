@@ -11,7 +11,7 @@
       "type": "dex",
       "entry": "myplugin.MyPlugin",
       "path": "dex/myplugin.dex",
-      "sha256": "9f735330993bcfeafe15228d2437afc87803a1bd64fa57053731c125ac62539d",
+      "sha256": "ad6c60e7cbfa9d1934d41bc415797a5624ac148c6e9cf42bcf03ca601580382a",
       "class": "myplugin.MyPlugin"
     },
     {

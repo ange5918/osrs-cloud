@@ -17,7 +17,6 @@ import com.ghost.api.skills.Skill;
 import com.ghost.api.skills.Skills;
 import com.ghost.api.widgets.Dialog;
 
-import com.astrastudio.nav.OfficialNav;
 import com.astrastudio.api.model.Client;
 import com.astrastudio.api.model.WorldPoint;
 
@@ -45,7 +44,7 @@ import java.util.function.Predicate;
 public final class MyPlugin implements Plugin {
     private PluginContext ctx;
     private Client client;
-    private OfficialNav nav;
+    // 寻路走 APK 门面 Walker.walkTo -> AutoNavPlugin(NavBot 2.83 完整寻路)
 
     private static final String CMD_FILE = "/data/local/tmp/myplugin.txt";
     private static final int EVERY = 30;   // 20ms/tick -> 约600ms, 对齐 Ghost onLoop
@@ -69,9 +68,8 @@ public final class MyPlugin implements Plugin {
     @Override
     public void startUp() {
         log("启动。启停: echo stop > " + CMD_FILE + " 停 / echo start 启 / echo stat 状态");
-        nav = new OfficialNav(client, ctx);
-        nav.init();
-        nav.setGoal(MINE_X, MINE_Y, MINE_PLANE, "鸡区");
+        // ★整套移植: 寻路交给 APK 常驻 AutoNavPlugin, 这里不再自建寻路器。
+        //   到鸡区的目标在 onTick 里用 Walker.walkTo(MINE_X,MINE_Y) 设置(幂等)。
     }
 
     @Override
@@ -131,15 +129,8 @@ public final class MyPlugin implements Plugin {
 
         // ===== 不在鸡区：官方 astar3 寻路走过去 =====
         if (!mine.contains(here)) {
-            WorldPoint meWp = client.getLocalPlayerLocation();
-            if (nav != null && meWp != null) nav.tick(meWp);
-            if (nav == null || nav.lastPlanFailed) {
-                long t = tick.getTick();
-                if (t - lastDirectWalk >= 100) {
-                    lastDirectWalk = t;
-                    log("官方寻路暂未规划出路径, 当前 " + here + " (等待重规划)");
-                }
-            }
+            // ★本脚本 onTick 每 tick 调门面 -> NavBot.step() 推进一步(APK 内无常驻 onTick)。
+            Walker.walkTo(MINE_X, MINE_Y, MINE_PLANE);
             return;
         }
 
