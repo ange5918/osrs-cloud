@@ -1,16 +1,16 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 22,
+  "version": 23,
   "updated": "2026-11-27",
-  "description": "设备端编译仓库：悬浮窗下载 java，手机本地 ecj+dx 编译成 dex，容器内 onLoop 每 tick 循环",
+  "description": "设备端编译仓库: 修复 Optional.isEmpty()->!isPresent() 兼容 Android9, public class MyPlugin",
   "scripts": [
     {
       "name": "myplugin",
-      "desc": "MyPlugin 杀鸡脚本(标准LoopedPlugin, public class): 悬浮窗下载java->手机编译dex->onLoop每tick",
-      "version": "3.1",
+      "desc": "MyPlugin 杀鸡脚本(Android9兼容版, isEmpty->isPresent)",
+      "version": "3.2",
       "type": "java",
-      "path": "src/MyPlugin_v31.java",
-      "sha256": "adae87ce387aa4f036eb9d2801be1461788364cd80b7facb04fae306e1ab61db"
+      "path": "src/MyPlugin_v32.java",
+      "sha256": "1f0a6f9e47af61f836b3fc8906c026ca025b7e9dc757106cbb80209c4911a1d5"
     }
   ],
   "offsets": {
