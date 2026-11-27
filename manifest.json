@@ -1,16 +1,16 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 23,
+  "version": 24,
   "updated": "2026-11-27",
-  "description": "设备端编译仓库: 修复 Optional.isEmpty()->!isPresent() 兼容 Android9, public class MyPlugin",
+  "description": "设备端编译仓库: 修复 Android9 兼容(isEmpty/lambda), public class MyPlugin, 无invokedynamic",
   "scripts": [
     {
       "name": "myplugin",
-      "desc": "MyPlugin 杀鸡脚本(Android9兼容版, isEmpty->isPresent)",
-      "version": "3.2",
+      "desc": "MyPlugin 杀鸡脚本(Android9兼容终版, 无lambda/Wait/真值门控)",
+      "version": "3.3",
       "type": "java",
-      "path": "src/MyPlugin_v32.java",
-      "sha256": "1f0a6f9e47af61f836b3fc8906c026ca025b7e9dc757106cbb80209c4911a1d5"
+      "path": "src/MyPlugin_v33.java",
+      "sha256": "e1564ee8839d57a21bf1fca3f4dc03f0b9867f063880b2cfcc57e51ed50a6c85"
     }
   ],
   "offsets": {
