@@ -1,8 +1,8 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 32,
+  "version": 33,
   "updated": "2026-11-28",
-  "description": "更新用户原始源码(me.attack() 真值测试)，D8 desugar 编译",
+  "description": "脚本容器仓库：Twilite_cow 走独立 dex，面板开关启停；myplugin 源码容器",
   "scripts": [
     {
       "name": "myplugin",
@@ -12,6 +12,16 @@
       "type": "java",
       "path": "src/myplugin.java",
       "sha256": "41f6daafd9336308587502bf1db998908acd88452b011781b58f4739688265ce"
+    },
+    {
+      "name": "twilite_cow",
+      "display": "Twilite_cow",
+      "desc": "Twilite 官方 API 版 cow 脚本（容器动态加载，开关启停）",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/twilite_cow.dex",
+      "sha256": "0c054f7e476d2e90141ffbd91377d20787dc215a6e7d1c290e85d8fd777cdf17",
+      "class": "org.example.Twilite_cow"
     }
   ],
   "offsets": {
