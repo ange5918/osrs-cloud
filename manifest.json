@@ -1,8 +1,8 @@
 {
   "repo": "osrs-cloud-local",
-  "version": 33,
+  "version": 34,
   "updated": "2026-11-28",
-  "description": "脚本容器仓库：Twilite_cow 走独立 dex，面板开关启停；myplugin 源码容器",
+  "description": "脚本容器仓库：Twilite_cow / Fish 走独立 dex，面板开关启停；myplugin 源码容器",
   "scripts": [
     {
       "name": "myplugin",
@@ -22,6 +22,16 @@
       "path": "dex/twilite_cow.dex",
       "sha256": "0c054f7e476d2e90141ffbd91377d20787dc215a6e7d1c290e85d8fd777cdf17",
       "class": "org.example.Twilite_cow"
+    },
+    {
+      "name": "fish",
+      "display": "Fish",
+      "desc": "C:/Fish 官方 Twilite API 版钓鱼脚本（org.example.FIsh，容器动态加载）",
+      "version": "1.0",
+      "type": "dex",
+      "path": "dex/fish.dex",
+      "sha256": "6f2c26d98497262fd4ab9f3071f26bde5b5fd475f08a7eb3f3feae46d93f997f",
+      "class": "org.example.FIsh"
     }
   ],
   "offsets": {
